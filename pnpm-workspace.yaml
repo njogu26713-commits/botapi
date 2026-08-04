@@ -33,6 +33,10 @@ minimumReleaseAgeExclude:
   # this setting guards against does not apply to our own packages.
   - '@replit/*'
   - stripe-replit-sync
+  - '@itsliaaa/baileys'
+  - libsodium-wrappers
+  - '@hapi/boom'
+  - '@hapi/hoek'
 
 packages:
   - artifacts/*
