@@ -4,6 +4,7 @@
 import { logger } from "../lib/logger.js";
 import type { PluginManifest, CommandDefinition } from "./types.js";
 import { Plugin } from "../database/models/Plugin.js";
+import { isDatabaseConnected } from "../database/index.js";
 
 class PluginRegistry {
   private plugins = new Map<string, PluginManifest>();
@@ -23,19 +24,25 @@ class PluginRegistry {
       throw new Error(`Invalid plugin manifest: ${manifest.name}`);
     }
 
-    // Check if disabled in DB
-    const dbRecord = await Plugin.findOne({ name: manifest.name });
-    if (dbRecord && !dbRecord.enabled) {
-      logger.info({ plugin: manifest.name }, "Plugin is disabled in DB — skipping");
-      return;
-    }
+    // Check if disabled in DB (best-effort — skip instantly if DB is not connected)
+    if (isDatabaseConnected()) {
+      try {
+        const dbRecord = await Plugin.findOne({ name: manifest.name });
+        if (dbRecord && dbRecord.enabled === false) {
+          logger.info({ plugin: manifest.name }, "Plugin is disabled in DB — skipping");
+          return;
+        }
 
-    // Upsert DB record
-    await Plugin.findOneAndUpdate(
-      { name: manifest.name },
-      { version: manifest.version, description: manifest.description, author: manifest.author },
-      { upsert: true },
-    );
+        // Upsert DB record
+        await Plugin.findOneAndUpdate(
+          { name: manifest.name },
+          { $set: { version: manifest.version, description: manifest.description, author: manifest.author }, $setOnInsert: { enabled: true } },
+          { upsert: true },
+        );
+      } catch (dbErr) {
+        logger.warn({ err: dbErr, plugin: manifest.name }, "DB unavailable during plugin registration — registering with defaults");
+      }
+    }
 
     // Register commands
     for (const cmd of manifest.commands) {

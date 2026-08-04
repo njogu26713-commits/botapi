@@ -3,6 +3,7 @@ import { logger } from "../lib/logger.js";
 import { config } from "../lib/config.js";
 
 let isConnected = false;
+export function isDatabaseConnected(): boolean { return isConnected; }
 
 export async function connectDatabase(): Promise<void> {
   if (isConnected) return;
