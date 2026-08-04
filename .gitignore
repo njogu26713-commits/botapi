@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# WhatsApp session data — keep out of version control.
+# On Railway, mount a Volume to SESSION_DIR so sessions persist across redeploys.
+artifacts/api-server/sessions/
