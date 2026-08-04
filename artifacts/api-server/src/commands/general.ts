@@ -22,6 +22,7 @@ function aiReplyWithButtons(replyText: string): any {
       { id: "history",     text: "📜 History" },
     ],
     "Reply with !ai <message> • !clear to reset",
+    "🤖 AI Response",
   );
 }
 import { formatDate } from "../utils/format.js";

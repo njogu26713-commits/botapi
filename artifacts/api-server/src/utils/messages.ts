@@ -208,11 +208,15 @@ export function nativeFlowMessage(
   footer?: string,
   headerText?: string,
 ): any {
+  const header = headerText
+    ? { title: headerText, hasMediaAttachment: false }
+    : { hasMediaAttachment: false }; // must be present; omitting it makes Baileys default to a media type
+
   const msg: any = {
     interactiveMessage: {
       body: { text: bodyText },
       footer: { text: footer ?? "" },
-      header: headerText ? { title: headerText, hasMediaAttachment: false } : undefined,
+      header,
       nativeFlowMessage: {
         buttons: buttons.map((b) => ({
           name: b.name,
