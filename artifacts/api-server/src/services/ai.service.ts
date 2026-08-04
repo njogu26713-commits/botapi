@@ -1,6 +1,7 @@
 /**
  * AI service — wraps OpenAI-compatible API for text generation,
  * image analysis, and structured completions.
+ * Supports Groq (preferred when GROQ_API_KEY is set) and OpenAI.
  */
 import OpenAI from "openai";
 import { config } from "../lib/config.js";
@@ -9,16 +10,38 @@ import { Conversation } from "../database/models/Conversation.js";
 import { User } from "../database/models/User.js";
 import type { IConversationMessage } from "../database/models/Conversation.js";
 
-let openai: OpenAI | null = null;
+type Provider = "groq" | "openai";
 
-function getClient(): OpenAI {
-  if (!openai) {
-    openai = new OpenAI({
-      apiKey: config.openaiApiKey || "sk-no-key",
-      baseURL: config.openaiBaseUrl,
-    });
+let clientCache: OpenAI | null = null;
+let cachedProvider: Provider | null = null;
+
+function resolveProvider(): Provider {
+  if (config.aiProvider === "groq") return "groq";
+  if (config.aiProvider === "openai") return "openai";
+  // auto: prefer Groq when key is present (faster, free-tier friendly)
+  return config.groqApiKey ? "groq" : "openai";
+}
+
+function getClient(): { client: OpenAI; provider: Provider; defaultModel: string } {
+  const provider = resolveProvider();
+  if (!clientCache || cachedProvider !== provider) {
+    if (provider === "groq") {
+      clientCache = new OpenAI({
+        apiKey: config.groqApiKey || "gsk-no-key",
+        baseURL: "https://api.groq.com/openai/v1",
+      });
+    } else {
+      clientCache = new OpenAI({
+        apiKey: config.openaiApiKey || "sk-no-key",
+        baseURL: config.openaiBaseUrl,
+      });
+    }
+    cachedProvider = provider;
+    logger.info({ provider }, "AI provider initialised");
   }
-  return openai;
+  const defaultModel =
+    provider === "groq" ? config.groqModel : config.openaiModel;
+  return { client: clientCache!, provider, defaultModel };
 }
 
 export interface ChatOptions {
@@ -47,19 +70,22 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
     return { reply: "AI features are currently disabled.", tokensUsed: 0, model: "none" };
   }
 
-  if (!config.openaiApiKey) {
+  const { provider } = getClient();
+  const hasKey = provider === "groq" ? !!config.groqApiKey : !!config.openaiApiKey;
+  if (!hasKey) {
     return {
-      reply: "⚠️ AI service is not configured. Please set OPENAI_API_KEY.",
+      reply: "⚠️ AI service is not configured. Please set GROQ_API_KEY or OPENAI_API_KEY.",
       tokensUsed: 0,
       model: "none",
     };
   }
 
+  const { defaultModel } = getClient();
   const {
     phoneNumber,
     userMessage,
     systemPromptOverride,
-    model = config.openaiModel,
+    model = defaultModel,
     maxTokens = config.openaiMaxTokens,
     imageUrl,
     imageBase64,
@@ -113,7 +139,7 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
   messages.push({ role: "user", content: userContent as any });
 
   try {
-    const client = getClient();
+    const { client, provider } = getClient();
     const completion = await client.chat.completions.create({
       model,
       messages,
@@ -123,6 +149,7 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
 
     const reply = completion.choices[0]?.message?.content ?? "I couldn't generate a response.";
     const tokensUsed = completion.usage?.total_tokens ?? 0;
+    logger.debug({ provider, model, tokensUsed }, "AI completion successful");
 
     // Save conversation history
     conv.messages.push({
@@ -155,7 +182,7 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
 
     return { reply, tokensUsed, model };
   } catch (err: any) {
-    logger.error({ err, phoneNumber }, "OpenAI API error");
+    logger.error({ err, phoneNumber }, "AI API error");
     const errorMessage = err?.error?.message ?? err?.message ?? "Unknown error";
     throw new Error(`AI Error: ${errorMessage}`);
   }
@@ -167,13 +194,15 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
 export async function complete(
   prompt: string,
   systemPrompt?: string,
-  model = config.openaiModel,
+  model?: string,
 ): Promise<string> {
-  if (!config.openaiApiKey) {
-    throw new Error("OpenAI API key not configured");
+  const { client, provider, defaultModel } = getClient();
+  const hasKey = provider === "groq" ? !!config.groqApiKey : !!config.openaiApiKey;
+  if (!hasKey) {
+    throw new Error("No AI API key configured. Set GROQ_API_KEY or OPENAI_API_KEY.");
   }
 
-  const client = getClient();
+  const resolvedModel = model ?? defaultModel;
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
   if (systemPrompt) {
@@ -182,7 +211,7 @@ export async function complete(
   messages.push({ role: "user", content: prompt });
 
   const completion = await client.chat.completions.create({
-    model,
+    model: resolvedModel,
     messages,
     max_tokens: 1024,
     temperature: 0.5,

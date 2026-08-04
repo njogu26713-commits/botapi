@@ -38,7 +38,14 @@ export const config = {
   botNumber: optional("BOT_NUMBER", ""), // phone number for pairing code
   pairingCode: optional("USE_PAIRING_CODE", "false") === "true",
 
-  // AI (OpenAI-compatible)
+  // AI provider selection: "groq" | "openai" | "auto" (auto = groq if key set, else openai)
+  aiProvider: optional("AI_PROVIDER", "auto"),
+
+  // Groq
+  groqApiKey: optional("GROQ_API_KEY", ""),
+  groqModel: optional("GROQ_MODEL", "llama-3.3-70b-versatile"),
+
+  // OpenAI (also used as OpenAI-compatible base)
   openaiApiKey: optional("OPENAI_API_KEY", ""),
   openaiBaseUrl: optional("OPENAI_BASE_URL", "https://api.openai.com/v1"),
   openaiModel: optional("OPENAI_MODEL", "gpt-4o"),
