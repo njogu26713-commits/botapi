@@ -43,7 +43,7 @@ export class WhatsAppConnection extends EventEmitter {
       this.socket = makeWASocket({
         version,
         auth: state,
-        printQRInTerminal: !config.pairingCode,
+        printQRInTerminal: false, // QR is served via the web UI at /api/
         logger: logger.child({ module: "baileys" }),
         browser: ["FireboxTechs Assistant", "Chrome", "125.0.0"],
         generateHighQualityLinkPreview: true,
@@ -78,14 +78,7 @@ export class WhatsAppConnection extends EventEmitter {
           this.emit("qr", qr);
           logger.info("📱 QR code generated — scan with WhatsApp");
 
-          // Pretty-print QR to terminal as well
-          try {
-            const QRCode = await import("qrcode");
-            const qrTerminal = await QRCode.default.toString(qr, { type: "terminal", small: true });
-            process.stdout.write("\n" + qrTerminal + "\n");
-          } catch {
-            // qrcode may not be available, ignore
-          }
+          // QR is served on the web UI at /api/ — no terminal output needed
         }
 
         if (connection === "close") {
