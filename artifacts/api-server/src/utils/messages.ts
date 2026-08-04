@@ -1,8 +1,15 @@
 /**
- * Rich message builders for WhatsApp via Baileys.
- * Supports: text, images, videos, audio, documents, stickers, location,
- * interactive buttons (native flow V2), quick-reply buttons, carousels,
- * and interactive lists.
+ * Rich message builders for WhatsApp via @itsliaaa/baileys.
+ *
+ * sendMessage() input formats (what this module builds):
+ *   - Native flow interactive  → { nativeFlow: [...], text, footer }
+ *   - List message             → { sections, buttonText, title, text, footer }
+ *   - Carousel (needs images)  → { cards: [...], text, footer }
+ *   - Plain text               → { text }
+ *
+ * The old approach pre-built { interactiveMessage: {...} } (proto output format),
+ * which Baileys rejects as "Invalid media type". These builders now produce the
+ * correct *input* format that generateWAMessageContent() accepts.
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -28,7 +35,7 @@ export interface VideoMessage {
 export interface AudioMessage {
   audio: Buffer | { url: string };
   mimetype?: string;
-  ptt?: boolean; // voice note
+  ptt?: boolean;
 }
 
 export interface DocumentMessage {
@@ -52,18 +59,6 @@ export interface LocationMessage {
   };
 }
 
-export interface QuickReplyButton {
-  id: string;
-  displayText: string;
-}
-
-export interface ButtonsMessage {
-  text: string;
-  footer?: string;
-  buttons: QuickReplyButton[];
-  headerType?: number;
-}
-
 export interface ListSection {
   title: string;
   rows: Array<{
@@ -71,23 +66,6 @@ export interface ListSection {
     description?: string;
     rowId: string;
   }>;
-}
-
-export interface ListMessage {
-  text: string;
-  footer?: string;
-  title?: string;
-  buttonText: string;
-  sections: ListSection[];
-}
-
-export interface CarouselFlexButton {
-  type: "quick_reply" | "cta_url";
-  displayText: string;
-  /** For quick_reply */
-  id?: string;
-  /** For cta_url */
-  url?: string;
 }
 
 export interface CarouselCard {
@@ -100,9 +78,11 @@ export interface CarouselCard {
   buttons: CarouselFlexButton[];
 }
 
-export interface NativeFlowButton {
-  name: string;
-  buttonParamsJson: string;
+export interface CarouselFlexButton {
+  type: "quick_reply" | "cta_url";
+  displayText: string;
+  id?: string;
+  url?: string;
 }
 
 // ─── Text ────────────────────────────────────────────────────────────────────
@@ -182,84 +162,42 @@ export function locationMessage(
   };
 }
 
-// ─── Interactive — Quick Reply Buttons ───────────────────────────────────────
-
-/**
- * Quick reply buttons message.
- * Falls back to button list on unsupported clients.
- */
-export function quickReplyButtons(
-  text: string,
-  buttons: Array<{ id: string; text: string }>,
-  footer?: string,
-): any {
-  return {
-    text,
-    footer,
-    buttons: buttons.map((b) => ({
-      buttonId: b.id,
-      buttonText: { displayText: b.text },
-      type: 1,
-    })),
-    headerType: 1,
-  };
-}
-
 // ─── Interactive — Native Flow V2 Buttons ────────────────────────────────────
 
 /**
- * Native Flow V2 interactive message with CTA / quick-reply buttons.
- * This is the modern WhatsApp Business API interactive format.
+ * Native Flow interactive message with quick-reply or CTA buttons.
+ *
+ * Baileys input format: { nativeFlow: [...], text, footer }
+ * Each button: { id, text } → quick_reply
+ *              { url, text } → cta_url
+ *              { call, text } → cta_call
  */
 export function nativeFlowMessage(
   bodyText: string,
-  buttons: NativeFlowButton[],
+  buttons: Array<{ id?: string; url?: string; call?: string; text: string }>,
   footer?: string,
-  headerText?: string,
 ): any {
-  const header = headerText
-    ? { title: headerText, hasMediaAttachment: false }
-    : { hasMediaAttachment: false }; // must be present; omitting it makes Baileys default to a media type
-
-  const msg: any = {
-    interactiveMessage: {
-      body: { text: bodyText },
-      footer: { text: footer ?? "" },
-      header,
-      nativeFlowMessage: {
-        buttons: buttons.map((b) => ({
-          name: b.name,
-          buttonParamsJson: b.buttonParamsJson,
-        })),
-        messageParamsJson: "",
-      },
-    },
+  return {
+    text: bodyText,
+    footer,
+    nativeFlow: buttons,
   };
-  return msg;
 }
 
 /**
- * Simple CTA reply buttons using Native Flow V2.
+ * CTA quick-reply buttons (most common interactive type).
  */
 export function ctaButtons(
   bodyText: string,
   buttons: Array<{ id: string; text: string }>,
   footer?: string,
-  header?: string,
+  _header?: string, // header text is not supported in native flow; kept for API compatibility
 ): any {
-  return nativeFlowMessage(
-    bodyText,
-    buttons.map((b) => ({
-      name: "quick_reply",
-      buttonParamsJson: JSON.stringify({ display_text: b.text, id: b.id }),
-    })),
-    footer,
-    header,
-  );
+  return nativeFlowMessage(bodyText, buttons, footer);
 }
 
 /**
- * CTA URL button (opens a URL).
+ * Single CTA URL button.
  */
 export function ctaUrlButton(
   bodyText: string,
@@ -267,20 +205,11 @@ export function ctaUrlButton(
   url: string,
   footer?: string,
 ): any {
-  return nativeFlowMessage(
-    bodyText,
-    [
-      {
-        name: "cta_url",
-        buttonParamsJson: JSON.stringify({ display_text: buttonText, url }),
-      },
-    ],
-    footer,
-  );
+  return nativeFlowMessage(bodyText, [{ url, text: buttonText }], footer);
 }
 
 /**
- * CTA call button (initiates a call).
+ * Single CTA call button.
  */
 export function ctaCallButton(
   bodyText: string,
@@ -288,20 +217,16 @@ export function ctaCallButton(
   phoneNumber: string,
   footer?: string,
 ): any {
-  return nativeFlowMessage(
-    bodyText,
-    [
-      {
-        name: "cta_call",
-        buttonParamsJson: JSON.stringify({ display_text: buttonText, phone_number: phoneNumber }),
-      },
-    ],
-    footer,
-  );
+  return nativeFlowMessage(bodyText, [{ call: phoneNumber, text: buttonText }], footer);
 }
 
 // ─── Interactive — List Message ───────────────────────────────────────────────
 
+/**
+ * List/menu message with categorised rows.
+ *
+ * Baileys input format: { sections, buttonText, title, text, footer }
+ */
 export function listMessage(
   title: string,
   bodyText: string,
@@ -315,57 +240,57 @@ export function listMessage(
     footer,
     buttonText,
     sections,
-    listType: 1,
   };
 }
 
 // ─── Interactive — Carousel ───────────────────────────────────────────────────
 
 /**
- * Carousel message (WhatsApp Business API).
- * Each card can have an image, body text, footer, and buttons.
+ * Carousel message. Each card MUST have an imageUrl — Baileys requires a valid
+ * image/video header per card. Cards without an image are rendered as list rows
+ * in a fallback list message instead.
  */
 export function carouselMessage(
   bodyText: string,
   cards: CarouselCard[],
 ): any {
-  return {
-    interactiveMessage: {
-      body: { text: bodyText },
-      carouselMessage: {
-        cards: cards.map((card) => ({
-          header: {
-            hasMediaAttachment: !!card.header.imageUrl,
-            imageMessage: card.header.imageUrl
-              ? { url: card.header.imageUrl, mimetype: "image/jpeg" }
-              : undefined,
-          },
-          body: { text: card.body },
-          footer: { text: card.footer ?? "" },
-          buttons: card.buttons.map((b) => {
-            if (b.type === "cta_url") {
-              return {
-                name: "cta_url",
-                buttonParamsJson: JSON.stringify({ display_text: b.displayText, url: b.url ?? "" }),
-              };
-            }
-            return {
-              name: "quick_reply",
-              buttonParamsJson: JSON.stringify({ display_text: b.displayText, id: b.id ?? "" }),
-            };
-          }),
-          nativeFlowMessage: {},
-        })),
-      },
-    },
-  };
+  const cardsWithImages = cards.filter((c) => c.header.imageUrl);
+  const cardsWithoutImages = cards.filter((c) => !c.header.imageUrl);
+
+  // If all cards have images, use the proper carousel format
+  if (cardsWithImages.length === cards.length) {
+    return {
+      text: bodyText,
+      cards: cards.map((card) => ({
+        image: { url: card.header.imageUrl! },
+        caption: card.body,
+        footer: card.footer,
+        nativeFlow: card.buttons.map((b) =>
+          b.type === "cta_url"
+            ? { url: b.url!, text: b.displayText }
+            : { id: b.id ?? b.displayText, text: b.displayText },
+        ),
+      })),
+    };
+  }
+
+  // Fallback: render as a list message when cards have no images
+  const rows = (cardsWithoutImages.length > 0 ? cardsWithoutImages : cards).map((card, i) => ({
+    rowId: card.buttons[0]?.id ?? `item_${i}`,
+    title: card.body.split("\n")[0]?.replace(/[*_]/g, "").trim().slice(0, 24) ?? `Item ${i + 1}`,
+    description: card.footer ?? "",
+  }));
+
+  return listMessage(
+    "🔥 FireboxTechs Services",
+    bodyText,
+    "🛠️ View Services",
+    [{ title: "Available", rows }],
+  );
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Format text for WhatsApp: bold, italic, monospace.
- */
 export const fmt = {
   bold: (s: string) => `*${s}*`,
   italic: (s: string) => `_${s}_`,
@@ -379,7 +304,7 @@ export const fmt = {
 };
 
 /**
- * Build a menu-style text list for WhatsApp.
+ * Build a plain-text menu string for WhatsApp (no interactive buttons).
  */
 export function buildMenu(
   title: string,
@@ -387,8 +312,7 @@ export function buildMenu(
   footer?: string,
 ): string {
   let msg = `${fmt.bold(title)}\n\n`;
-  items.forEach((item, i) => {
-    const num = `${i + 1}.`;
+  items.forEach((item) => {
     const emoji = item.emoji ?? "•";
     msg += `${emoji} ${fmt.bold(item.label)}`;
     if (item.desc) msg += `\n   ${item.desc}`;

@@ -5,6 +5,7 @@ import { logger } from "../lib/logger.js";
 import { pluginRegistry } from "../plugins/loader.js";
 import { COMMAND_PREFIX } from "../commands/registry.js";
 import { User } from "../database/models/User.js";
+import { isDatabaseConnected } from "../database/index.js";
 import type { CommandContext } from "../plugins/types.js";
 
 /**
@@ -116,6 +117,7 @@ function buildContext(socket: any, message: any): CommandContext | null {
  * Upsert user record and update stats.
  */
 async function touchUser(ctx: CommandContext, isCommand: boolean): Promise<void> {
+  if (!isDatabaseConnected()) return; // skip instantly when DB is offline
   try {
     const update: any = {
       $set: { "stats.lastSeen": new Date(), pushName: ctx.pushName },
