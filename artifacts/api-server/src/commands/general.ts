@@ -11,6 +11,19 @@ import {
   buildMenu,
   fmt,
 } from "../utils/messages.js";
+
+/** Wrap an AI reply in quick-reply buttons for common follow-up actions. */
+function aiReplyWithButtons(replyText: string): any {
+  return ctaButtons(
+    replyText,
+    [
+      { id: "ai_followup", text: "💬 Ask again" },
+      { id: "clear",       text: "🗑️ Clear chat" },
+      { id: "history",     text: "📜 History" },
+    ],
+    "Reply with !ai <message> • !clear to reset",
+  );
+}
 import { formatDate } from "../utils/format.js";
 import { config } from "../lib/config.js";
 
@@ -107,9 +120,11 @@ export const generalPlugin: PluginManifest = {
             phoneNumber: ctx.phoneNumber,
             userMessage: ctx.rawArgs,
           });
-          await ctx.replyText(result.reply);
+          await ctx.reply(aiReplyWithButtons(result.reply));
         } catch (err: any) {
-          await ctx.replyText(`❌ AI Error: ${err.message}`);
+          await ctx.reply(
+            aiReplyWithButtons(`❌ AI Error: ${err.message}`),
+          );
         }
       },
     },
