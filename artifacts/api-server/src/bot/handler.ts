@@ -20,13 +20,38 @@ function buildContext(socket: any, message: any): CommandContext | null {
     : from;
 
   // Extract plain text from various message types
-  const body =
+  let body: string =
     message.message?.conversation ||
     message.message?.extendedTextMessage?.text ||
     message.message?.imageMessage?.caption ||
     message.message?.videoMessage?.caption ||
     message.message?.documentMessage?.caption ||
     "";
+
+  // Native Flow V2 quick-reply button tap → extract the button ID
+  if (!body) {
+    const nativeFlowParams =
+      message.message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
+    if (nativeFlowParams) {
+      try {
+        const parsed = JSON.parse(nativeFlowParams);
+        if (parsed?.id) body = parsed.id;
+      } catch {
+        /* ignore malformed JSON */
+      }
+    }
+  }
+
+  // Legacy buttonsResponseMessage tap
+  if (!body) {
+    const legacyId = message.message?.buttonsResponseMessage?.selectedButtonId;
+    if (legacyId) body = legacyId;
+  }
+
+  // If the extracted ID looks like a bare command (no prefix), prepend it
+  if (body && !body.startsWith(COMMAND_PREFIX) && /^[a-z_]+$/.test(body)) {
+    body = `${COMMAND_PREFIX}${body}`;
+  }
 
   const phoneNumber = sender.replace(/[^0-9]/g, "");
   const pushName = message.pushName ?? "";

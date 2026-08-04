@@ -2,8 +2,84 @@
  * FireboxTechs-specific commands: branding, services, referrals, contact.
  */
 import type { PluginManifest } from "../plugins/types.js";
-import { ctaButtons, listMessage, fmt } from "../utils/messages.js";
+import { ctaButtons, listMessage, carouselMessage, fmt } from "../utils/messages.js";
+import type { CarouselCard } from "../utils/messages.js";
 import { config } from "../lib/config.js";
+
+const SERVICES: CarouselCard[] = [
+  {
+    header: {},
+    body: `🎬 *CineVault*\n\nStream and discover movies and TV shows.`,
+    footer: "cinevault.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "🎬 Open Service", url: "https://cinevault.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_cinevault" },
+    ],
+  },
+  {
+    header: {},
+    body: `🌍 *BConnect*\n\nMarketplace, businesses, housing, jobs, and community platform.`,
+    footer: "bconnect.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "🌍 Open Service", url: "https://bconnect.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_bconnect" },
+    ],
+  },
+  {
+    header: {},
+    body: `💻 *CodeLab*\n\nLearn programming with AI-powered lessons and coding challenges.`,
+    footer: "codelab.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "💻 Open Service", url: "https://codelab.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_codelab" },
+    ],
+  },
+  {
+    header: {},
+    body: `🛡️ *Cyber Academy*\n\nLearn ethical hacking, cybersecurity, networking, and digital safety.`,
+    footer: "cyberacademy.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "🛡️ Open Service", url: "https://cyberacademy.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_cyberacademy" },
+    ],
+  },
+  {
+    header: {},
+    body: `🤖 *Firebox AI*\n\nAI assistant for coding, research, writing, and productivity.`,
+    footer: "ai.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "🤖 Open Service", url: "https://ai.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_fireboxai" },
+    ],
+  },
+  {
+    header: {},
+    body: `🚀 *Firebox Deploy*\n\nDeploy and manage your applications and websites.`,
+    footer: "deploy.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "🚀 Open Service", url: "https://deploy.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_deploy" },
+    ],
+  },
+  {
+    header: {},
+    body: `📇 *VCF Generator*\n\nGenerate and share contact cards instantly.`,
+    footer: "vcf.firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "📇 Open Service", url: "https://vcf.firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_vcf" },
+    ],
+  },
+  {
+    header: {},
+    body: `🌐 *FireboxTechs*\n\nExplore all FireboxTechs products, services, and updates.`,
+    footer: "firebox.live",
+    buttons: [
+      { type: "cta_url",    displayText: "🌐 Open Website", url: "https://firebox.live" },
+      { type: "quick_reply", displayText: "ℹ️ Learn More",  id: "learn_firebox" },
+    ],
+  },
+];
 
 export const fireboxPlugin: PluginManifest = {
   name: "firebox",
@@ -12,7 +88,22 @@ export const fireboxPlugin: PluginManifest = {
   author: "FireboxTechs",
 
   commands: [
-    // ─── Services ────────────────────────────────────────────────────────────
+    // ─── Service Carousel ─────────────────────────────────────────────────────
+    {
+      name: ["carousel", "platform", "apps"],
+      description: "Swipeable carousel of all FireboxTechs services",
+      category: "firebox",
+      async handler(ctx) {
+        await ctx.sendTyping();
+        const msg = carouselMessage(
+          `🔥 *FireboxTechs Services*\n\nSwipe through our platforms — tap *Open Service* to visit or *Learn More* for details.`,
+          SERVICES,
+        );
+        await ctx.reply(msg);
+      },
+    },
+
+    // ─── Services (list fallback) ──────────────────────────────────────────────
     {
       name: ["services", "firebox", "what"],
       description: "View FireboxTechs services and offerings",

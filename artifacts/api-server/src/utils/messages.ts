@@ -81,6 +81,15 @@ export interface ListMessage {
   sections: ListSection[];
 }
 
+export interface CarouselFlexButton {
+  type: "quick_reply" | "cta_url";
+  displayText: string;
+  /** For quick_reply */
+  id?: string;
+  /** For cta_url */
+  url?: string;
+}
+
 export interface CarouselCard {
   header: {
     imageUrl?: string;
@@ -88,7 +97,7 @@ export interface CarouselCard {
   };
   body: string;
   footer?: string;
-  buttons: QuickReplyButton[];
+  buttons: CarouselFlexButton[];
 }
 
 export interface NativeFlowButton {
@@ -333,10 +342,18 @@ export function carouselMessage(
           },
           body: { text: card.body },
           footer: { text: card.footer ?? "" },
-          buttons: card.buttons.map((b) => ({
-            name: "quick_reply",
-            buttonParamsJson: JSON.stringify({ display_text: b.displayText, id: b.id }),
-          })),
+          buttons: card.buttons.map((b) => {
+            if (b.type === "cta_url") {
+              return {
+                name: "cta_url",
+                buttonParamsJson: JSON.stringify({ display_text: b.displayText, url: b.url ?? "" }),
+              };
+            }
+            return {
+              name: "quick_reply",
+              buttonParamsJson: JSON.stringify({ display_text: b.displayText, id: b.id ?? "" }),
+            };
+          }),
           nativeFlowMessage: {},
         })),
       },

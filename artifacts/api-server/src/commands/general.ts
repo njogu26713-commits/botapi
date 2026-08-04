@@ -59,9 +59,41 @@ export const generalPlugin: PluginManifest = {
       },
     },
 
+    // ─── Menu ─────────────────────────────────────────────────────────────
+    {
+      name: ["menu", "m"],
+      description: "Main menu with quick navigation buttons",
+      category: "general",
+      async handler(ctx) {
+        await ctx.sendTyping();
+        const name = ctx.pushName || "there";
+        const msg = ctaButtons(
+          `🔥 *FIREBOX TECHS BOT*\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `🤖 _AI-Powered WhatsApp Assistant_\n\n` +
+          `Welcome back, *${name}*! Choose a menu option:\n\n` +
+          `📋 *Main Menu* — Core commands & features\n` +
+          `👑 *Owner Menu* — Admin & management tools\n` +
+          `⬇️ *Download Menu* — Media & file downloads\n` +
+          `👥 *Group Menu* — Group management tools\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `💡 _Type !help for the full command list_`,
+          [
+            { id: "main_menu",     text: "📋 Main Menu" },
+            { id: "owner_menu",    text: "👑 Owner Menu" },
+            { id: "download_menu", text: "⬇️ Download Menu" },
+            { id: "group_menu",    text: "👥 Group Menu" },
+          ],
+          "FireboxTechs — Empowering your digital experience",
+          "🔥 FireboxTechs Assistant",
+        );
+        await ctx.reply(msg);
+      },
+    },
+
     // ─── Help ──────────────────────────────────────────────────────────────
     {
-      name: ["help", "commands", "menu"],
+      name: ["help", "commands"],
       description: "Show all available commands",
       category: "general",
       async handler(ctx) {

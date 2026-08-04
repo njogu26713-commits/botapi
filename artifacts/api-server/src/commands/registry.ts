@@ -8,6 +8,7 @@ import { securityPlugin } from "./security.js";
 import { mediaPlugin } from "./media.js";
 import { fireboxPlugin } from "./firebox.js";
 import { utilitiesPlugin } from "./utilities.js";
+import { menusPlugin } from "./menus.js";
 
 export const COMMAND_PREFIX = "!";
 
@@ -19,6 +20,7 @@ export async function registerAllPlugins(socket?: any): Promise<void> {
     mediaPlugin,
     fireboxPlugin,
     utilitiesPlugin,
+    menusPlugin,
   ];
 
   for (const plugin of plugins) {
