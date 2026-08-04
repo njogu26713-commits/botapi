@@ -74,7 +74,7 @@ export async function scheduleReminder(
     scheduledAt,
     isRecurring: false,
   });
-  return (reminder._id as string).toString();
+  return (reminder._id as unknown as string).toString();
 }
 
 /** Schedule a recurring cron-based reminder */

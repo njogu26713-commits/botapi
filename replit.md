@@ -1,6 +1,6 @@
-# [Project name]
+# FireboxTechs WhatsApp Assistant
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+An AI-powered WhatsApp bot built with Baileys + OpenAI, supporting commands for chat, media, cybersecurity, programming help, utilities (weather, search, news), and FireboxTechs brand information.
 
 ## Run & Operate
 
@@ -22,11 +22,19 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/api-server/src/bot/` — WhatsApp connection & auth (Baileys)
+- `artifacts/api-server/src/commands/` — all bot command plugins (general, media, security, programming, firebox, utilities)
+- `artifacts/api-server/src/services/` — AI (OpenAI), weather, search/news, translation, scheduler
+- `artifacts/api-server/src/database/models/` — MongoDB schemas (User, Message, Conversation, Plugin, Reminder, Settings, AdminUser)
+- `lib/db/` — PostgreSQL schema via Drizzle ORM
+- `lib/api-zod/` — Zod schemas generated from OpenAPI spec
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Dual database**: MongoDB (mongoose) for bot state (users, conversations, plugins) + PostgreSQL (Drizzle) for structured data. MongoDB was chosen for its flexible schema on chat history.
+- **Plugin system**: Commands are grouped into `PluginManifest` objects. The `pluginRegistry` in `plugins/loader.ts` manages registration and can enable/disable plugins via MongoDB at runtime.
+- **Command prefix**: All bot commands use `!` prefix (e.g. `!ai`, `!weather`, `!code`). Defined in `commands/registry.ts`.
+- **Build step**: esbuild bundles the TypeScript server to `dist/index.mjs` before running — source maps enabled for debugging.
 
 ## Product
 

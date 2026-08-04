@@ -2,7 +2,7 @@
   "compilerOptions": {
     "incremental": true,
     "isolatedModules": true,
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmitOnError": true,
@@ -19,7 +19,7 @@
     "useUnknownInCatchVariables": true,
     "alwaysStrict": true,
     "skipLibCheck": true,
-    "target": "es2022",
+    "target": "es2023",
     "types": [],
     "customConditions": ["workspace"]
   }

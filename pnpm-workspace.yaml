@@ -74,8 +74,11 @@ autoInstallPeers: false
 
 onlyBuiltDependencies:
   - '@swc/core'
+  - '@itsliaaa/baileys'
   - esbuild
   - msw
+  - protobufjs
+  - sharp
   - unrs-resolver
 
 overrides:
