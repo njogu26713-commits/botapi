@@ -85,6 +85,66 @@ export async function complete(
   return completion.choices[0]?.message?.content ?? "";
 }
 
+// ─── Smart quick-reply selection ─────────────────────────────────────────────
+
+/**
+ * Given the user's message, the AI's reply, and the full pool of configured
+ * quick-reply buttons, ask the AI to pick which 0–3 buttons make sense as
+ * natural follow-up options for this specific conversation turn.
+ *
+ * Returns a (possibly empty) subset of `availableLabels`.
+ */
+export async function selectQuickReplies(
+  userMessage: string,
+  aiReply: string,
+  availableLabels: string[],
+): Promise<string[]> {
+  if (!availableLabels.length) return [];
+
+  const hasKey = !!(config.groqApiKey || config.openaiApiKey);
+  if (!hasKey) return availableLabels.slice(0, 3); // fallback — no key
+
+  try {
+    const { client, model } = getClient();
+
+    const systemPrompt = `You decide which quick-reply buttons to show a WhatsApp user after an AI response.
+You are given a pool of available buttons and must choose a subset (0 to 3) that are the most relevant follow-ups for THIS specific conversation turn.
+Respond with ONLY a JSON array of button labels chosen from the pool, e.g. ["Our Services","Pricing Info"].
+If none fit, respond with [].
+Never invent new labels — only use labels from the pool exactly as written.`;
+
+    const userPrompt = `Available buttons: ${JSON.stringify(availableLabels)}
+
+User said: "${userMessage}"
+AI replied: "${aiReply.slice(0, 400)}"
+
+Which buttons (0–3) are the best follow-ups right now?`;
+
+    const completion = await client.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 100,
+      temperature: 0.2,
+    });
+
+    const raw = completion.choices[0]?.message?.content?.trim() ?? "[]";
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    // Only keep labels that exist in the pool (prevents hallucinations)
+    const pool = new Set(availableLabels);
+    return (parsed as unknown[])
+      .filter((l): l is string => typeof l === "string" && pool.has(l))
+      .slice(0, 3);
+  } catch (err) {
+    logger.warn({ err }, "Quick-reply selection failed — using all buttons");
+    return availableLabels.slice(0, 3);
+  }
+}
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 export interface ChatOptions {
