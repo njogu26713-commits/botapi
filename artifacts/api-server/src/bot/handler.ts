@@ -166,18 +166,16 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
     const result = await chat({
       phoneNumber: ctx.phoneNumber,
       userMessage: prompt,
-      systemPrompt: settings.systemPrompt,
+      systemPrompt: settings.systemPrompt + "\n\nKeep every reply to 40–50 words maximum. Be concise and direct.",
     });
 
     // Ask AI to generate contextual quick-reply buttons for this turn
     const chosenLabels = await generateQuickReplies(prompt, result.reply);
     const buttons = chosenLabels.map((label) => ({ id: label, text: label }));
 
-    // A wide separator forces WhatsApp to stretch the message bubble wider
-    const WIDE_SEP = "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
     const content =
       buttons.length > 0
-        ? { text: result.reply + WIDE_SEP, footer: "FireboxTechs AI", nativeFlow: buttons }
+        ? { text: result.reply, footer: "FireboxTechs AI", nativeFlow: buttons }
         : { text: result.reply };
 
     await ctx.reply(content);
