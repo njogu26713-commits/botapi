@@ -49,28 +49,37 @@ function buildCtx(socket: any, message: any): Ctx | null {
 
   let isButtonTap = false;
 
-  // Native Flow V2 quick-reply tap → get the button id (which we set to the label)
+  // Button tap detection — covers all known response formats
   if (!body) {
+    // nativeFlow quick_reply → comes back as templateButtonReplyMessage in this Baileys fork
+    const tpl = message.message?.templateButtonReplyMessage?.selectedId
+      ?? message.message?.templateButtonReplyMessage?.selectedDisplayText;
+    if (tpl) { body = tpl; isButtonTap = true; }
+  }
+
+  if (!body) {
+    // interactiveResponseMessage → nativeFlowResponseMessage (standard Baileys)
     const paramsJson =
       message.message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
     if (paramsJson) {
       try {
         const parsed = JSON.parse(paramsJson);
-        if (parsed?.id) {
-          body = parsed.id;
-          isButtonTap = true;
-        }
+        const id = parsed?.id || parsed?.display_text || "";
+        if (id) { body = id; isButtonTap = true; }
       } catch { /* ignore */ }
     }
   }
 
-  // Legacy buttonsResponseMessage tap
   if (!body) {
+    // Legacy buttons
     const legacyId = message.message?.buttonsResponseMessage?.selectedButtonId;
-    if (legacyId) {
-      body = legacyId;
-      isButtonTap = true;
-    }
+    if (legacyId) { body = legacyId; isButtonTap = true; }
+  }
+
+  if (!body) {
+    // List row selection
+    const rowId = message.message?.listResponseMessage?.singleSelectReply?.selectedRowId;
+    if (rowId) { body = rowId; isButtonTap = true; }
   }
 
   if (!body.trim()) return null;
@@ -140,6 +149,9 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
   }
 
   // ── AI chat ───────────────────────────────────────────────────────────────
+  // Only respond to DMs — ignore group messages unless it's a button tap from the group
+  if (ctx.isGroup && !ctx.isButtonTap) return;
+
   logger.info({ from: ctx.from, phoneNumber: ctx.phoneNumber, isButtonTap: ctx.isButtonTap }, "AI message received");
 
   const settings = getSettings();
