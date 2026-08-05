@@ -1,17 +1,35 @@
 /**
- * Message handler — dispatches incoming WhatsApp messages to the plugin registry.
+ * Message handler — routes all WhatsApp messages to Groq AI.
+ * Any text a user sends gets an AI reply plus quick-reply buttons.
+ * Messages starting with ! are admin commands (plugin system).
  */
 import { logger } from "../lib/logger.js";
 import { pluginRegistry } from "../plugins/loader.js";
 import { COMMAND_PREFIX } from "../commands/registry.js";
-import { User } from "../database/models/User.js";
-import { isDatabaseConnected } from "../database/index.js";
-import type { CommandContext } from "../plugins/types.js";
+import { chat, clearHistory } from "../services/ai.service.js";
+import { getSettings } from "../lib/settings-store.js";
 
-/**
- * Build a CommandContext from a raw Baileys message.
- */
-function buildContext(socket: any, message: any): CommandContext | null {
+// ─── Context builder ──────────────────────────────────────────────────────────
+
+interface Ctx {
+  socket: any;
+  from: string;
+  message: any;
+  phoneNumber: string;
+  pushName: string;
+  isGroup: boolean;
+  text: string;             // raw text or button label
+  isButtonTap: boolean;     // true when text came from a quick-reply tap
+  isAdminCommand: boolean;  // true when text starts with !
+  command: string;          // command name without prefix (admin only)
+  args: string[];
+  rawArgs: string;
+  replyText: (t: string) => Promise<void>;
+  reply: (c: any) => Promise<void>;
+  sendTyping: () => Promise<void>;
+}
+
+function buildCtx(socket: any, message: any): Ctx | null {
   const from = message.key?.remoteJid;
   if (!from || from === "status@broadcast") return null;
 
@@ -20,7 +38,7 @@ function buildContext(socket: any, message: any): CommandContext | null {
     ? (message.key?.participant ?? message.key?.remoteJid ?? "")
     : from;
 
-  // Extract plain text from various message types
+  // ── Extract text ──────────────────────────────────────────────────────────
   let body: string =
     message.message?.conversation ||
     message.message?.extendedTextMessage?.text ||
@@ -29,30 +47,33 @@ function buildContext(socket: any, message: any): CommandContext | null {
     message.message?.documentMessage?.caption ||
     "";
 
-  // Native Flow V2 quick-reply button tap → extract the button ID
+  let isButtonTap = false;
+
+  // Native Flow V2 quick-reply tap → get the button id (which we set to the label)
   if (!body) {
-    const nativeFlowParams =
+    const paramsJson =
       message.message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson;
-    if (nativeFlowParams) {
+    if (paramsJson) {
       try {
-        const parsed = JSON.parse(nativeFlowParams);
-        if (parsed?.id) body = parsed.id;
-      } catch {
-        /* ignore malformed JSON */
-      }
+        const parsed = JSON.parse(paramsJson);
+        if (parsed?.id) {
+          body = parsed.id;
+          isButtonTap = true;
+        }
+      } catch { /* ignore */ }
     }
   }
 
   // Legacy buttonsResponseMessage tap
   if (!body) {
     const legacyId = message.message?.buttonsResponseMessage?.selectedButtonId;
-    if (legacyId) body = legacyId;
+    if (legacyId) {
+      body = legacyId;
+      isButtonTap = true;
+    }
   }
 
-  // If the extracted ID looks like a bare command (no prefix), prepend it
-  if (body && !body.startsWith(COMMAND_PREFIX) && /^[a-z_]+$/.test(body)) {
-    body = `${COMMAND_PREFIX}${body}`;
-  }
+  if (!body.trim()) return null;
 
   const phoneNumber = sender.replace(/[^0-9]/g, "");
   const pushName = message.pushName ?? "";
@@ -60,119 +81,96 @@ function buildContext(socket: any, message: any): CommandContext | null {
   const replyText = async (text: string) => {
     await socket.sendMessage(from, { text }, { quoted: message });
   };
-
   const reply = async (content: any) => {
     await socket.sendMessage(from, content, { quoted: message });
   };
-
   const sendTyping = async () => {
     await socket.sendPresenceUpdate("composing", from);
   };
 
-  // Detect command
-  if (!body.startsWith(COMMAND_PREFIX)) {
-    return {
-      socket,
-      from,
-      message,
-      text: body,
-      command: "",
-      args: [],
-      rawArgs: body,
-      isGroup,
-      groupId: isGroup ? from : undefined,
-      pushName,
-      phoneNumber,
-      reply,
-      replyText,
-      sendTyping,
-    };
-  }
-
-  const withoutPrefix = body.slice(COMMAND_PREFIX.length).trim();
+  // Admin command detection (! prefix, but not a button tap)
+  const isAdminCommand = !isButtonTap && body.startsWith(COMMAND_PREFIX);
+  const withoutPrefix = isAdminCommand ? body.slice(COMMAND_PREFIX.length).trim() : "";
   const parts = withoutPrefix.split(/\s+/);
-  const command = (parts[0] ?? "").toLowerCase();
-  const args = parts.slice(1);
-  const rawArgs = args.join(" ");
+  const command = isAdminCommand ? (parts[0] ?? "").toLowerCase() : "";
+  const args = isAdminCommand ? parts.slice(1) : [];
 
   return {
-    socket,
-    from,
-    message,
-    text: body,
-    command,
-    args,
-    rawArgs,
-    isGroup,
-    groupId: isGroup ? from : undefined,
-    pushName,
-    phoneNumber,
-    reply,
-    replyText,
-    sendTyping,
+    socket, from, message, phoneNumber, pushName, isGroup,
+    text: body.trim(), isButtonTap, isAdminCommand, command, args,
+    rawArgs: args.join(" "),
+    replyText, reply, sendTyping,
   };
 }
 
-/**
- * Upsert user record and update stats.
- */
-async function touchUser(ctx: CommandContext, isCommand: boolean): Promise<void> {
-  if (!isDatabaseConnected()) return; // skip instantly when DB is offline
-  try {
-    const update: any = {
-      $set: { "stats.lastSeen": new Date(), pushName: ctx.pushName },
-      $inc: { "stats.totalMessages": 1 },
-    };
-    if (isCommand) update.$inc["stats.totalCommands"] = 1;
+// ─── Main handler ─────────────────────────────────────────────────────────────
 
-    await User.findOneAndUpdate(
-      { phoneNumber: ctx.phoneNumber },
-      update,
-      { upsert: true, new: true },
-    );
-  } catch (err) {
-    logger.error({ err }, "Failed to upsert user");
-  }
-}
-
-/**
- * Handle a single incoming message.
- */
 export async function handleMessage(socket: any, message: any): Promise<void> {
-  // Ignore own messages and status broadcasts
   if (message.key?.fromMe) return;
 
-  const ctx = buildContext(socket, message);
+  const ctx = buildCtx(socket, message);
   if (!ctx) return;
 
-  const isCommand = ctx.command !== "";
+  // ── Admin commands (! prefix) ─────────────────────────────────────────────
+  if (ctx.isAdminCommand) {
+    // Special: !clear resets AI memory for this user
+    if (ctx.command === "clear") {
+      clearHistory(ctx.phoneNumber);
+      await ctx.replyText("🧹 Conversation cleared. Let's start fresh!");
+      return;
+    }
 
-  // Update user stats in background
-  touchUser(ctx, isCommand).catch(() => {});
+    const cmdDef = pluginRegistry.getCommand(ctx.command);
+    if (!cmdDef) {
+      if (!ctx.isGroup) {
+        await ctx.replyText(`❓ Unknown command: *${COMMAND_PREFIX}${ctx.command}*`);
+      }
+      return;
+    }
 
-  if (!isCommand) return; // not a command — ignore for now
-
-  const cmdDef = pluginRegistry.getCommand(ctx.command);
-  if (!cmdDef) {
-    // Unknown command — silently ignore (avoid noise in groups)
-    if (!ctx.isGroup) {
-      await ctx.replyText(
-        `❓ Unknown command: *${COMMAND_PREFIX}${ctx.command}*\n\nSend *${COMMAND_PREFIX}help* to see all available commands.`,
-      );
+    logger.info({ command: ctx.command, phoneNumber: ctx.phoneNumber }, "Admin command received");
+    try {
+      await ctx.sendTyping();
+      await cmdDef.handler(ctx as any);
+    } catch (err: any) {
+      logger.error({ err, command: ctx.command }, "Command error");
+      await ctx.replyText(`❌ Error running *${COMMAND_PREFIX}${ctx.command}*. Please try again.`);
     }
     return;
   }
 
-  logger.info(
-    { from: ctx.from, command: ctx.command, phoneNumber: ctx.phoneNumber },
-    "Command received",
-  );
+  // ── AI chat ───────────────────────────────────────────────────────────────
+  logger.info({ from: ctx.from, phoneNumber: ctx.phoneNumber, isButtonTap: ctx.isButtonTap }, "AI message received");
+
+  const settings = getSettings();
+
+  // Frame button taps as explicit selections so AI understands context
+  const prompt = ctx.isButtonTap
+    ? `The user tapped the quick reply button: "${ctx.text}". Respond helpfully to this choice.`
+    : ctx.text;
 
   try {
     await ctx.sendTyping();
-    await cmdDef.handler(ctx);
+    const result = await chat({
+      phoneNumber: ctx.phoneNumber,
+      userMessage: prompt,
+      systemPrompt: settings.systemPrompt,
+    });
+
+    // Build message with quick-reply buttons (if any configured)
+    const buttons = settings.quickReplies.map((qr) => ({
+      id: qr.label,
+      text: qr.label,
+    }));
+
+    const content =
+      buttons.length > 0
+        ? { text: result.reply, footer: "FireboxTechs AI", nativeFlow: buttons }
+        : { text: result.reply };
+
+    await ctx.reply(content);
   } catch (err: any) {
-    logger.error({ err, command: ctx.command }, "Command handler error");
-    await ctx.replyText(`❌ An error occurred while running *${COMMAND_PREFIX}${ctx.command}*. Please try again.`);
+    logger.error({ err, phoneNumber: ctx.phoneNumber }, "AI chat error");
+    await ctx.replyText("⚠️ AI is unavailable right now. Please try again in a moment.");
   }
 }

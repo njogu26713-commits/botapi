@@ -6,9 +6,13 @@ import { ctaButtons, listMessage, carouselMessage, fmt } from "../utils/messages
 import type { CarouselCard } from "../utils/messages.js";
 import { config } from "../lib/config.js";
 
+// Carousel card images — 800×400 branded placeholders (WhatsApp downloads these for each card header)
+const IMG = (color: string, label: string) =>
+  `https://placehold.co/800x400/${color}/ffffff?text=${encodeURIComponent(label)}&font=montserrat`;
+
 const SERVICES: CarouselCard[] = [
   {
-    header: {},
+    header: { imageUrl: IMG("e50914", "CineVault") },
     body: `🎬 *CineVault*\n\nStream and discover movies and TV shows.`,
     footer: "cinevault.firebox.live",
     buttons: [
@@ -17,7 +21,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("0a7ea4", "BConnect") },
     body: `🌍 *BConnect*\n\nMarketplace, businesses, housing, jobs, and community platform.`,
     footer: "bconnect.firebox.live",
     buttons: [
@@ -26,7 +30,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("6b21a8", "CodeLab") },
     body: `💻 *CodeLab*\n\nLearn programming with AI-powered lessons and coding challenges.`,
     footer: "codelab.firebox.live",
     buttons: [
@@ -35,7 +39,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("166534", "Cyber+Academy") },
     body: `🛡️ *Cyber Academy*\n\nLearn ethical hacking, cybersecurity, networking, and digital safety.`,
     footer: "cyberacademy.firebox.live",
     buttons: [
@@ -44,7 +48,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("d97706", "Firebox+AI") },
     body: `🤖 *Firebox AI*\n\nAI assistant for coding, research, writing, and productivity.`,
     footer: "ai.firebox.live",
     buttons: [
@@ -53,7 +57,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("0f4c75", "Firebox+Deploy") },
     body: `🚀 *Firebox Deploy*\n\nDeploy and manage your applications and websites.`,
     footer: "deploy.firebox.live",
     buttons: [
@@ -62,7 +66,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("1e3a5f", "VCF+Generator") },
     body: `📇 *VCF Generator*\n\nGenerate and share contact cards instantly.`,
     footer: "vcf.firebox.live",
     buttons: [
@@ -71,7 +75,7 @@ const SERVICES: CarouselCard[] = [
     ],
   },
   {
-    header: {},
+    header: { imageUrl: IMG("b91c1c", "FireboxTechs") },
     body: `🌐 *FireboxTechs*\n\nExplore all FireboxTechs products, services, and updates.`,
     footer: "firebox.live",
     buttons: [

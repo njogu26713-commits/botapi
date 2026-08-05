@@ -5,6 +5,7 @@ import { ensureSessionDir } from "./bot/auth.js";
 import { registerAllPlugins } from "./commands/registry.js";
 import { handleMessage } from "./bot/handler.js";
 import { connectDatabase } from "./database/index.js";
+import { loadSettings } from "./lib/settings-store.js";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +28,9 @@ app.listen(port, async (err?: Error) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Load bot settings from disk
+  loadSettings();
 
   // Connect to MongoDB
   try {
