@@ -6,7 +6,7 @@
 import { logger } from "../lib/logger.js";
 import { pluginRegistry } from "../plugins/loader.js";
 import { COMMAND_PREFIX } from "../commands/registry.js";
-import { chat, clearHistory, selectQuickReplies } from "../services/ai.service.js";
+import { chat, clearHistory, generateQuickReplies } from "../services/ai.service.js";
 import { getSettings } from "../lib/settings-store.js";
 
 // ─── Context builder ──────────────────────────────────────────────────────────
@@ -169,9 +169,8 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
       systemPrompt: settings.systemPrompt,
     });
 
-    // Ask AI which buttons from the pool are relevant for this turn
-    const allLabels = settings.quickReplies.map((qr) => qr.label);
-    const chosenLabels = await selectQuickReplies(prompt, result.reply, allLabels);
+    // Ask AI to generate contextual quick-reply buttons for this turn
+    const chosenLabels = await generateQuickReplies(prompt, result.reply);
     const buttons = chosenLabels.map((label) => ({ id: label, text: label }));
 
     const content =
