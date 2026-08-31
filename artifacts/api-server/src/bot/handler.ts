@@ -166,7 +166,9 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
     const result = await chat({
       phoneNumber: ctx.phoneNumber,
       userMessage: prompt,
-      systemPrompt: settings.systemPrompt + "\n\nGive enough context to be genuinely helpful. Prefer a concise explanation plus actionable steps, examples, or a relevant warning when appropriate. Do not sacrifice important details just to be short.",
+      // The dashboard value is authoritative: it controls the bot’s
+      // personality, expertise, priorities, and response style.
+      systemPrompt: settings.systemPrompt,
     });
 
     // Send the AI answer immediately. Optional quick-reply generation must not

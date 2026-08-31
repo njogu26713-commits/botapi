@@ -235,7 +235,8 @@ const HTML = `<!DOCTYPE html>
 
     <div class="field">
       <label for="system-prompt">🎯 AI Personality / Focus</label>
-      <textarea id="system-prompt" rows="5" placeholder="e.g. You are a helpful assistant for FireboxTechs. Focus on tech support and our services…"></textarea>
+      <textarea id="system-prompt" rows="5" placeholder="Write exactly how you want the bot to behave, what it should focus on, and how it should answer…"></textarea>
+      <p class="hint" style="text-align:left;margin-top:6px;">This instruction directly controls the bot’s personality, expertise, priorities, and response style.</p>
     </div>
 
     <div class="field">
