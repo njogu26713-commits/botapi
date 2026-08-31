@@ -171,12 +171,9 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
       systemPrompt: settings.systemPrompt,
     });
 
-    // Send the AI answer immediately. Optional quick-reply generation must not
-    // delay or prevent the user from receiving the actual response.
-    await ctx.replyText(result.reply);
-
-    // Generate buttons as a separate, optional message. A timeout protects the
-    // reply path if the second Groq request is slow or unavailable.
+    // Generate buttons before sending so the answer and buttons appear in one
+    // WhatsApp card. The timeout prevents a slow second Groq request from
+    // keeping the user waiting indefinitely.
     const chosenLabels = await Promise.race([
       generateQuickReplies(prompt, result.reply),
       new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 8000)),
@@ -188,16 +185,17 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
     const labels = chosenLabels.length > 0 ? chosenLabels : fallbackLabels;
     const buttons = labels.map((label) => ({ id: label, text: label }));
 
-    if (buttons.length > 0) {
-      try {
-        await ctx.reply({
-          text: "Choose an option:",
-          footer: "FireboxTechs AI",
-          buttons,
-        });
-      } catch (err) {
-        logger.warn({ err, phoneNumber: ctx.phoneNumber }, "Quick-reply message failed; AI answer was already sent");
+    try {
+      if (buttons.length > 0) {
+        // The buttons are rendered directly below this text in one card.
+        await ctx.reply({ text: result.reply, footer: "FireboxTechs AI", buttons });
+      } else {
+        await ctx.replyText(result.reply);
       }
+    } catch (err) {
+      // Never lose the AI answer if a client rejects the interactive payload.
+      logger.warn({ err, phoneNumber: ctx.phoneNumber }, "Combined button message failed; sending plain AI answer");
+      await ctx.replyText(result.reply);
     }
   } catch (err: any) {
     logger.error({ err, phoneNumber: ctx.phoneNumber }, "AI chat error");
