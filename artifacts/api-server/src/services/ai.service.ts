@@ -4,6 +4,7 @@
  */
 import OpenAI from "openai";
 import { config } from "../lib/config.js";
+import { getSettings } from "../lib/settings-store.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Client ───────────────────────────────────────────────────────────────────
@@ -51,6 +52,11 @@ function appendHistory(phoneNumber: string, role: "user" | "assistant", content:
 
 export function clearHistory(phoneNumber: string): void {
   conversations.delete(phoneNumber);
+}
+
+/** Clear all conversations after the administrator changes the persona. */
+export function clearAllHistories(): void {
+  conversations.clear();
 }
 
 // ─── Compatibility shims for plugin commands ──────────────────────────────────
@@ -161,6 +167,7 @@ Suggest 0–3 quick-reply button labels for what the user might want next:`;
 export interface ChatOptions {
   phoneNumber: string;
   userMessage: string;
+  // When omitted by a command, use the currently saved dashboard persona.
   systemPrompt?: string;
 }
 
@@ -184,7 +191,9 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: "system",
-      content: opts.systemPrompt || "You are a helpful AI assistant.",
+      // Never fall back to a hidden generic persona; use the saved dashboard
+      // prompt for every caller that does not provide a specialized prompt.
+      content: (opts.systemPrompt?.trim() || getSettings().systemPrompt.trim()),
     },
     ...history,
     { role: "user", content: opts.userMessage },

@@ -5,6 +5,7 @@
  */
 import { Router, type IRouter } from "express";
 import { getSettings, saveSettings, type BotSettings } from "../lib/settings-store.js";
+import { clearAllHistories } from "../services/ai.service.js";
 import { logger } from "../lib/logger.js";
 
 const router: IRouter = Router();
@@ -31,7 +32,13 @@ router.post("/bot/settings", (req, res) => {
     };
 
     saveSettings(settings);
-    logger.info({ quickReplyCount: settings.quickReplies.length }, "Bot settings updated");
+    // A persona change should start a clean conversation so old assistant
+    // messages cannot compete with the newly saved instructions.
+    clearAllHistories();
+    logger.info({
+      quickReplyCount: settings.quickReplies.length,
+      personaLength: settings.systemPrompt.length,
+    }, "Bot settings and AI persona updated");
     res.json({ ok: true });
   } catch (err: any) {
     logger.error({ err }, "Failed to save settings");
