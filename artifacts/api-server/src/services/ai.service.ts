@@ -130,7 +130,13 @@ Suggest 0–3 quick-reply button labels for what the user might want next:`;
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() ?? "[]";
-    const parsed: unknown = JSON.parse(raw);
+    // Models sometimes wrap JSON in a Markdown code fence or add a short
+    // sentence. Extract the first JSON array before parsing.
+    const jsonText = raw
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .match(/\[[\s\S]*\]/)?.[0] ?? "[]";
+    const parsed: unknown = JSON.parse(jsonText);
     if (!Array.isArray(parsed)) return [];
 
     return (parsed as unknown[])

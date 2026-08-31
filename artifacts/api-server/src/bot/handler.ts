@@ -169,13 +169,25 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
       systemPrompt: settings.systemPrompt + "\n\nGive enough context to be genuinely helpful. Prefer a concise explanation plus actionable steps, examples, or a relevant warning when appropriate. Do not sacrifice important details just to be short.",
     });
 
-    // Ask AI to generate contextual quick-reply buttons for this turn
+    // Ask AI to generate contextual quick-reply buttons for this turn. If the
+    // model returns no valid labels, use the admin-configured defaults so the
+    // response still contains clickable actions.
     const chosenLabels = await generateQuickReplies(prompt, result.reply);
-    const buttons = chosenLabels.map((label) => ({ id: label, text: label }));
+    const fallbackLabels = settings.quickReplies
+      .map((item) => item.label.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    const labels = chosenLabels.length > 0 ? chosenLabels : fallbackLabels;
+    const buttons = labels.map((label) => ({ id: label, text: label }));
 
     const content =
       buttons.length > 0
-        ? { text: result.reply, footer: "FireboxTechs AI", nativeFlow: buttons }
+        ? {
+            text: result.reply,
+            footer: "FireboxTechs AI",
+            nativeFlow: buttons,
+            interactiveAsTemplate: true,
+          }
         : { text: result.reply };
 
     await ctx.reply(content);

@@ -181,6 +181,9 @@ export function nativeFlowMessage(
     text: bodyText,
     footer,
     nativeFlow: buttons,
+    // Template wrapping is supported by this Baileys fork and is more
+    // consistently rendered as clickable buttons across WhatsApp clients.
+    interactiveAsTemplate: true,
   };
 }
 
