@@ -3,6 +3,7 @@
  */
 import type { PluginManifest } from "../plugins/types.js";
 import { chat, clearConversation, getConversationHistory } from "../services/ai.service.js";
+import { getSettings } from "../lib/settings-store.js";
 import { pluginRegistry } from "../plugins/loader.js";
 import { User } from "../database/models/User.js";
 import {
@@ -152,6 +153,7 @@ export const generalPlugin: PluginManifest = {
           const result = await chat({
             phoneNumber: ctx.phoneNumber,
             userMessage: ctx.rawArgs,
+            systemPrompt: getSettings().systemPrompt,
           });
           await ctx.reply(aiReplyWithButtons(result.reply));
         } catch (err: any) {
