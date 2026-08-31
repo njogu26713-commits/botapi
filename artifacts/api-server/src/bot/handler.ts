@@ -169,10 +169,16 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
       systemPrompt: settings.systemPrompt + "\n\nGive enough context to be genuinely helpful. Prefer a concise explanation plus actionable steps, examples, or a relevant warning when appropriate. Do not sacrifice important details just to be short.",
     });
 
-    // Ask AI to generate contextual quick-reply buttons for this turn. If the
-    // model returns no valid labels, use the admin-configured defaults so the
-    // response still contains clickable actions.
-    const chosenLabels = await generateQuickReplies(prompt, result.reply);
+    // Send the AI answer immediately. Optional quick-reply generation must not
+    // delay or prevent the user from receiving the actual response.
+    await ctx.replyText(result.reply);
+
+    // Generate buttons as a separate, optional message. A timeout protects the
+    // reply path if the second Groq request is slow or unavailable.
+    const chosenLabels = await Promise.race([
+      generateQuickReplies(prompt, result.reply),
+      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 8000)),
+    ]);
     const fallbackLabels = settings.quickReplies
       .map((item) => item.label.trim())
       .filter(Boolean)
@@ -180,19 +186,23 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
     const labels = chosenLabels.length > 0 ? chosenLabels : fallbackLabels;
     const buttons = labels.map((label) => ({ id: label, text: label }));
 
-    const content =
-      buttons.length > 0
-        ? {
-            text: result.reply,
-            footer: "FireboxTechs AI",
-            nativeFlow: buttons,
-            interactiveAsTemplate: true,
-          }
-        : { text: result.reply };
-
-    await ctx.reply(content);
+    if (buttons.length > 0) {
+      try {
+        await ctx.reply({
+          text: "Choose an option:",
+          footer: "FireboxTechs AI",
+          nativeFlow: buttons,
+          interactiveAsTemplate: true,
+        });
+      } catch (err) {
+        logger.warn({ err, phoneNumber: ctx.phoneNumber }, "Quick-reply message failed; AI answer was already sent");
+      }
+    }
   } catch (err: any) {
     logger.error({ err, phoneNumber: ctx.phoneNumber }, "AI chat error");
     await ctx.replyText("⚠️ AI is unavailable right now. Please try again in a moment.");
+  } finally {
+    // Stop the composing indicator once processing finishes or fails.
+    await socket.sendPresenceUpdate("paused", ctx.from).catch(() => undefined);
   }
 }

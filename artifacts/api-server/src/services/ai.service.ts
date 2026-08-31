@@ -11,8 +11,16 @@ import { logger } from "../lib/logger.js";
 function getClient(): { client: OpenAI; model: string } {
   const useGroq = !!config.groqApiKey;
   const client = useGroq
-    ? new OpenAI({ apiKey: config.groqApiKey, baseURL: "https://api.groq.com/openai/v1" })
-    : new OpenAI({ apiKey: config.openaiApiKey || "sk-no-key", baseURL: config.openaiBaseUrl });
+    ? new OpenAI({
+        apiKey: config.groqApiKey,
+        baseURL: "https://api.groq.com/openai/v1",
+        timeout: 30000,
+      })
+    : new OpenAI({
+        apiKey: config.openaiApiKey || "sk-no-key",
+        baseURL: config.openaiBaseUrl,
+        timeout: 30000,
+      });
   const model = useGroq ? config.groqModel : config.openaiModel;
   return { client, model };
 }
