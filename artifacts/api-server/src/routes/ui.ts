@@ -293,8 +293,11 @@ const HTML = `<!DOCTYPE html>
           </div>
           <p class="hint">Open <strong>WhatsApp → Settings → Linked Devices → Link a Device</strong> and scan.</p>\`;
       } else {
-        refreshBtn.style.display = 'none';
-        waBody.innerHTML = '<p class="hint">⏳ Waiting for QR from WhatsApp servers…</p>';
+        // A QR reference expires after a short period. Expose the existing
+        // restart endpoint so the dashboard can recover without a redeploy.
+        refreshBtn.style.display = '';
+        refreshBtn.textContent = '🔄 Start / Refresh QR';
+        waBody.innerHTML = '<p class="hint">⏳ Waiting for a new QR from WhatsApp servers…</p>';
       }
     }
 
@@ -324,7 +327,20 @@ const HTML = `<!DOCTYPE html>
         }
       } catch (_) {}
     }
-    function forceRefresh() { qrTs = Date.now(); lastState = null; poll(); }
+    async function forceRefresh() {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = '⏳ Restarting…';
+      try {
+        await fetch('/api/bot/restart', { method: 'POST' });
+      } catch (_) {
+        // The normal polling loop will show the latest state.
+      } finally {
+        qrTs = Date.now();
+        lastState = null;
+        refreshBtn.disabled = false;
+        poll();
+      }
+    }
     poll();
     setInterval(poll, 3000);
 

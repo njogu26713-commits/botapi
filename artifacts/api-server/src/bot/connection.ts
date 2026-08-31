@@ -18,8 +18,11 @@ export type BotSocket = Awaited<ReturnType<typeof createConnection>> extends { s
 export class WhatsAppConnection extends EventEmitter {
   public socket: any = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
+  // Railway and other hosted environments can transiently time out while
+  // WhatsApp is issuing QR references. Do not permanently stop after a fixed
+  // number of retries; only authentication/logout errors are terminal.
   private reconnectDelay = 3000;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private isConnecting = false;
   private shouldReconnect = true;
   public qrCode: string | null = null;
@@ -28,6 +31,11 @@ export class WhatsAppConnection extends EventEmitter {
 
   async connect(): Promise<void> {
     if (this.isConnecting) return;
+    if (!this.shouldReconnect) this.shouldReconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.isConnecting = true;
 
     try {
@@ -86,28 +94,31 @@ export class WhatsAppConnection extends EventEmitter {
           this.qrCode = null;
           this.emit("disconnected");
 
-          const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-          const reason = (lastDisconnect?.error as any)?.output?.payload?.error;
+          const disconnectError = lastDisconnect?.error as any;
+          // Baileys versions expose the status code in slightly different
+          // locations. Reading all supported locations prevents a transient
+          // 408 from being mistaken for a terminal logout.
+          const statusCode =
+            disconnectError?.output?.statusCode ??
+            disconnectError?.statusCode ??
+            disconnectError?.data?.statusCode;
+          const reason = disconnectError?.output?.payload?.error ?? disconnectError?.message;
 
           logger.warn({ statusCode, reason }, "WhatsApp connection closed");
 
-          const shouldReconnect =
-            this.shouldReconnect &&
-            statusCode !== 401 && // logged out
-            statusCode !== 403 && // banned
-            this.reconnectAttempts < this.maxReconnectAttempts;
-
-          if (shouldReconnect) {
+          const terminalDisconnect = statusCode === 401 || statusCode === 403;
+          if (this.shouldReconnect && !terminalDisconnect) {
             this.reconnectAttempts++;
             const delay = Math.min(
-              this.reconnectDelay * this.reconnectAttempts,
+              this.reconnectDelay * Math.max(1, this.reconnectAttempts),
               30000,
             );
             logger.info(
               { attempt: this.reconnectAttempts, delay },
               "Reconnecting to WhatsApp...",
             );
-            setTimeout(() => {
+            this.reconnectTimer = setTimeout(() => {
+              this.reconnectTimer = null;
               this.isConnecting = false;
               this.connect().catch((err) =>
                 logger.error({ err }, "Reconnect failed"),
@@ -147,6 +158,10 @@ export class WhatsAppConnection extends EventEmitter {
 
   async disconnect(): Promise<void> {
     this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.socket) {
       try {
         await this.socket.logout();
