@@ -4,6 +4,7 @@
  * Messages starting with ! are admin commands (plugin system).
  */
 import { logger } from "../lib/logger.js";
+import { config } from "../lib/config.js";
 import { pluginRegistry } from "../plugins/loader.js";
 import { COMMAND_PREFIX } from "../commands/registry.js";
 import { chat, clearHistory, generateQuickReplies } from "../services/ai.service.js";
@@ -187,8 +188,17 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
 
     try {
       if (buttons.length > 0) {
-        // The buttons are rendered directly below this text in one card.
-        await ctx.reply({ text: result.reply, footer: "FireboxTechs AI", buttons });
+        // With an image configured, Baileys renders the image above the
+        // caption and places the clickable buttons below it in one card.
+        const card = config.aiCardImageUrl
+          ? {
+              image: { url: config.aiCardImageUrl },
+              caption: result.reply,
+              footer: "FireboxTechs AI",
+              buttons,
+            }
+          : { text: result.reply, footer: "FireboxTechs AI", buttons };
+        await ctx.reply(card);
       } else {
         await ctx.replyText(result.reply);
       }
