@@ -35,8 +35,9 @@ export const config = {
   // WhatsApp / Baileys
   sessionDir: optional("SESSION_DIR", "./sessions"),
   botName: optional("BOT_NAME", "FireboxTechs Assistant"),
-  // Optional public HTTPS image shown above AI text in the combined card.
-  aiCardImageUrl: optional("AI_CARD_IMAGE_URL", ""),
+  // Public image shown above AI text in the combined card.
+  aiCardImageUrl:
+    "https://i.supaimg.com/1630e54f-5f6e-40f7-858f-ee94727fa543/e7949f4f-b319-4cab-a850-17e3bb2d2abc.jpg",
   botNumber: optional("BOT_NUMBER", ""), // phone number for pairing code
   pairingCode: optional("USE_PAIRING_CODE", "false") === "true",
 

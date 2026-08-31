@@ -195,7 +195,9 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
               image: { url: config.aiCardImageUrl },
               caption: result.reply,
               footer: "FireboxTechs AI",
-              buttons,
+              // Hydrated template buttons are the fork’s media-compatible
+              // clickable-button format.
+              templateButtons: buttons,
             }
           : { text: result.reply, footer: "FireboxTechs AI", buttons };
         await ctx.reply(card);
