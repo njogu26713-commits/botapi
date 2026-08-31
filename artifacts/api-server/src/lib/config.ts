@@ -43,7 +43,8 @@ export const config = {
 
   // Groq
   groqApiKey: optional("GROQ_API_KEY", ""),
-  groqModel: optional("GROQ_MODEL", "llama-3.3-70b-versatile"),
+  // Current Groq production replacement for the retired Llama 3.3 70B model.
+  groqModel: optional("GROQ_MODEL", "openai/gpt-oss-120b"),
 
   // OpenAI (also used as OpenAI-compatible base)
   openaiApiKey: optional("OPENAI_API_KEY", ""),

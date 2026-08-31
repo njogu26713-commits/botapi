@@ -166,7 +166,7 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
     const result = await chat({
       phoneNumber: ctx.phoneNumber,
       userMessage: prompt,
-      systemPrompt: settings.systemPrompt + "\n\nKeep every reply to 40–50 words maximum. Be concise and direct.",
+      systemPrompt: settings.systemPrompt + "\n\nGive enough context to be genuinely helpful. Prefer a concise explanation plus actionable steps, examples, or a relevant warning when appropriate. Do not sacrifice important details just to be short.",
     });
 
     // Ask AI to generate contextual quick-reply buttons for this turn

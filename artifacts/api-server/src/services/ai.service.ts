@@ -79,8 +79,8 @@ export async function complete(
   const completion = await client.chat.completions.create({
     model: model ?? defaultModel,
     messages,
-    max_tokens: 1024,
-    temperature: 0.5,
+    max_tokens: 2048,
+    temperature: 0.7,
   });
   return completion.choices[0]?.message?.content ?? "";
 }
@@ -180,7 +180,7 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
     const completion = await client.chat.completions.create({
       model,
       messages,
-      max_tokens: 1024,
+      max_tokens: 2048,
       temperature: 0.7,
     });
 
