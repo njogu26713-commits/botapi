@@ -193,8 +193,7 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
         await ctx.reply({
           text: "Choose an option:",
           footer: "FireboxTechs AI",
-          nativeFlow: buttons,
-          interactiveAsTemplate: true,
+          buttons,
         });
       } catch (err) {
         logger.warn({ err, phoneNumber: ctx.phoneNumber }, "Quick-reply message failed; AI answer was already sent");

@@ -2,7 +2,7 @@
  * Rich message builders for WhatsApp via @itsliaaa/baileys.
  *
  * sendMessage() input formats (what this module builds):
- *   - Native flow interactive  → { nativeFlow: [...], text, footer }
+ *   - Clickable response buttons → { buttons: [...], text, footer }
  *   - List message             → { sections, buttonText, title, text, footer }
  *   - Carousel (needs images)  → { cards: [...], text, footer }
  *   - Plain text               → { text }
@@ -165,12 +165,12 @@ export function locationMessage(
 // ─── Interactive — Native Flow V2 Buttons ────────────────────────────────────
 
 /**
- * Native Flow interactive message with quick-reply or CTA buttons.
+ * Clickable WhatsApp response buttons.
  *
- * Baileys input format: { nativeFlow: [...], text, footer }
- * Each button: { id, text } → quick_reply
- *              { url, text } → cta_url
- *              { call, text } → cta_call
+ * The installed Baileys fork accepts { buttons: [...], text, footer } and
+ * converts each { id, text } item into a native response button. This format
+ * is rendered more consistently across WhatsApp clients than raw native-flow
+ * payloads.
  */
 export function nativeFlowMessage(
   bodyText: string,
@@ -180,10 +180,7 @@ export function nativeFlowMessage(
   return {
     text: bodyText,
     footer,
-    nativeFlow: buttons,
-    // Template wrapping is supported by this Baileys fork and is more
-    // consistently rendered as clickable buttons across WhatsApp clients.
-    interactiveAsTemplate: true,
+    buttons,
   };
 }
 
