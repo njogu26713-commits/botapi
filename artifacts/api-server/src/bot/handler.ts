@@ -10,6 +10,21 @@ import { COMMAND_PREFIX } from "../commands/registry.js";
 import { chat, clearHistory, generateQuickReplies } from "../services/ai.service.js";
 import { getSettings } from "../lib/settings-store.js";
 
+async function fetchCardImage(url: string): Promise<Buffer | undefined> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok || !response.headers.get("content-type")?.startsWith("image/")) return undefined;
+    return Buffer.from(await response.arrayBuffer());
+  } catch (err) {
+    logger.warn({ err }, "Card image unavailable; using the same card without image");
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ─── Context builder ──────────────────────────────────────────────────────────
 
 interface Ctx {
@@ -190,13 +205,13 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
       if (buttons.length > 0) {
         // With an image configured, Baileys renders the image above the
         // caption and places the clickable buttons below it in one card.
-        const card = config.aiCardImageUrl
+        const cardImage = await fetchCardImage(config.aiCardImageUrl);
+        const card = cardImage
           ? {
-              image: { url: config.aiCardImageUrl },
+              image: cardImage,
               caption: result.reply,
               footer: "FireboxTechs AI",
-              // Hydrated template buttons are the fork’s media-compatible
-              // clickable-button format.
+              // Hydrated template buttons keep image, text, and buttons in one card.
               templateButtons: buttons,
             }
           : { text: result.reply, footer: "FireboxTechs AI", buttons };
