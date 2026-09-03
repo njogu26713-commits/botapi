@@ -25,11 +25,26 @@ export interface ResponseGuidelines {
   escalation: string;
 }
 
-export interface ProductKnowledge {
+export type OfferingType =
+  | "product"
+  | "service"
+  | "package"
+  | "subscription"
+  | "solution"
+  | "course"
+  | "event"
+  | "promotion"
+  | "custom";
+
+export interface OfferingKnowledge {
   id: string;
+  type: OfferingType;
   name: string;
   category: string;
+  /** Short answer used when the assistant needs a quick overview. */
   summary: string;
+  /** Full offering description used for detailed support answers. */
+  description: string;
   features: string;
   benefits: string;
   pricing: string;
@@ -38,18 +53,26 @@ export interface ProductKnowledge {
   active: boolean;
 }
 
+/** @deprecated Use OfferingKnowledge for new records. */
+export type ProductKnowledge = OfferingKnowledge;
+
 export interface BotSettings {
   /** Additional free-form instructions for the assistant. */
   systemPrompt: string;
   company: CompanyProfile;
   responseGuidelines: ResponseGuidelines;
-  products: ProductKnowledge[];
+  offerings: OfferingKnowledge[];
   policies: string;
+  /** @deprecated Use offerings. Kept as a response/save compatibility alias. */
+  products: OfferingKnowledge[];
   /** @deprecated Dynamic clarification buttons no longer use this list. */
   quickReplies: QuickReply[];
 }
 
 const SETTINGS_FILE = path.resolve(process.cwd(), "data/bot-settings.json");
+const OFFERING_TYPES = new Set<OfferingType>([
+  "product", "service", "package", "subscription", "solution", "course", "event", "promotion", "custom",
+]);
 
 const DEFAULT_SETTINGS: BotSettings = {
   systemPrompt:
@@ -66,8 +89,9 @@ const DEFAULT_SETTINGS: BotSettings = {
     format: "Use short WhatsApp-friendly paragraphs, numbered steps, and simple bullets.",
     escalation: "If the information is unavailable or the issue needs a human, say so clearly and ask the user to contact support.",
   },
-  products: [],
+  offerings: [],
   policies: "Do not invent prices, guarantees, features, availability, policies, or company details. If a fact is not in the knowledge center, say that you do not have that information and ask a focused question or recommend human support.",
+  products: [],
   quickReplies: [],
 };
 
@@ -75,22 +99,25 @@ function stringValue(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
-function productValue(value: unknown, fallback = ""): string {
-  return typeof value === "string" ? value : fallback;
-}
-
-function normalizeProduct(value: unknown, index: number): ProductKnowledge {
+function normalizeOffering(value: unknown, index: number): OfferingKnowledge {
   const item = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawType = stringValue(item.type, "service") as OfferingType;
+  const type = OFFERING_TYPES.has(rawType) ? rawType : "custom";
+  const summary = stringValue(item.summary, stringValue(item.description)).trim();
+  const description = stringValue(item.description, summary).trim();
+
   return {
-    id: productValue(item.id, `product_${index + 1}`),
-    name: productValue(item.name),
-    category: productValue(item.category),
-    summary: productValue(item.summary),
-    features: productValue(item.features),
-    benefits: productValue(item.benefits),
-    pricing: productValue(item.pricing),
-    support: productValue(item.support),
-    faqs: productValue(item.faqs),
+    id: stringValue(item.id, `offering_${index + 1}`).trim(),
+    type,
+    name: stringValue(item.name).trim(),
+    category: stringValue(item.category).trim(),
+    summary,
+    description,
+    features: stringValue(item.features).trim(),
+    benefits: stringValue(item.benefits).trim(),
+    pricing: stringValue(item.pricing).trim(),
+    support: stringValue(item.support).trim(),
+    faqs: stringValue(item.faqs).trim(),
     active: item.active !== false,
   };
 }
@@ -105,7 +132,13 @@ export function normalizeSettings(value: unknown): BotSettings {
     ? raw.responseGuidelines as Record<string, unknown>
     : {};
   const rawQuickReplies = Array.isArray(raw.quickReplies) ? raw.quickReplies : [];
-  const rawProducts = Array.isArray(raw.products) ? raw.products : [];
+  // Prefer the new field, but automatically migrate records saved as products.
+  const rawOfferings = Array.isArray(raw.offerings)
+    ? raw.offerings
+    : Array.isArray(raw.products) ? raw.products : [];
+  const offerings = rawOfferings
+    .slice(0, 50)
+    .map((item, index) => normalizeOffering(item, index));
 
   return {
     systemPrompt: stringValue(raw.systemPrompt, DEFAULT_SETTINGS.systemPrompt).trim(),
@@ -121,11 +154,10 @@ export function normalizeSettings(value: unknown): BotSettings {
       format: stringValue(rawGuidelines.format, DEFAULT_SETTINGS.responseGuidelines.format).trim(),
       escalation: stringValue(rawGuidelines.escalation, DEFAULT_SETTINGS.responseGuidelines.escalation).trim(),
     },
-    products: rawProducts
-      .slice(0, 50)
-      .map((item, index) => normalizeProduct(item, index)),
+    offerings,
     policies: stringValue(raw.policies, DEFAULT_SETTINGS.policies).trim(),
-    // Keep legacy settings readable, but do not use them to build AI replies.
+    // Compatibility alias for older API consumers; the AI uses offerings.
+    products: offerings,
     quickReplies: rawQuickReplies
       .filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
       .map((item) => ({ label: stringValue(item.label).trim() }))

@@ -139,7 +139,7 @@ const HTML = `<!DOCTYPE html>
     .field:last-child { margin-bottom:0; }
     label { font-size:12px; font-weight:600; color:var(--label); }
 
-    textarea, input[type=text] {
+    textarea, input[type=text], select {
       background:var(--surface2);
       border:1px solid var(--border);
       border-radius:10px;
@@ -173,17 +173,17 @@ const HTML = `<!DOCTYPE html>
     .field-hint { color:var(--muted); font-size:11px; line-height:1.45; margin-top:5px; }
     input[type=text], textarea { min-height:40px; }
     textarea.compact { min-height:78px; }
-    .product-list { display:flex; flex-direction:column; gap:12px; }
-    .product-card {
+    .offering-list { display:flex; flex-direction:column; gap:12px; }
+    .offering-card {
       background:var(--surface2); border:1px solid var(--border); border-radius:14px;
       padding:14px; box-shadow:0 8px 20px #00000015;
     }
-    .product-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
-    .product-card-title { font-size:13px; font-weight:700; }
-    .product-card-subtitle { color:var(--muted); font-size:11px; margin-top:3px; }
-    .product-actions { display:flex; align-items:center; gap:8px; }
-    .product-status { background:none; border:0; color:var(--green); cursor:pointer; font-family:inherit; font-size:10px; font-weight:700; letter-spacing:.7px; padding:4px 0; text-transform:uppercase; }
-    .product-status.inactive { color:var(--muted); }
+    .offering-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .offering-card-title { font-size:13px; font-weight:700; }
+    .offering-card-subtitle { color:var(--muted); font-size:11px; margin-top:3px; }
+    .offering-actions { display:flex; align-items:center; gap:8px; }
+    .offering-status { background:none; border:0; color:var(--green); cursor:pointer; font-family:inherit; font-size:10px; font-weight:700; letter-spacing:.7px; padding:4px 0; text-transform:uppercase; }
+    .offering-status.inactive { color:var(--muted); }
     .btn-icon, .btn-add {
       background:none; border:1px solid var(--border); border-radius:9px;
       color:var(--muted); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
@@ -193,9 +193,14 @@ const HTML = `<!DOCTYPE html>
     .btn-icon:hover { background:#ff444420; border-color:#ff444450; color:#ff7777; }
     .btn-add { border-style:dashed; padding:10px 12px; width:100%; }
     .btn-add:hover { border-color:#25D36660; color:var(--green); background:#25D36608; }
-    .product-empty {
+    .offering-empty {
       border:1px dashed var(--border); border-radius:12px; color:var(--muted);
       font-size:12px; line-height:1.5; padding:18px; text-align:center;
+    }
+    select {
+      appearance:none; background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+      background-position:calc(100% - 16px) 17px, calc(100% - 11px) 17px; background-repeat:no-repeat; background-size:5px 5px, 5px 5px;
+      padding-right:30px;
     }
     .knowledge-callout {
       background:linear-gradient(135deg,#25D36610,#3b82f608); border:1px solid #25D36625;
@@ -271,7 +276,7 @@ const HTML = `<!DOCTYPE html>
     </div>
 
     <div class="knowledge-callout">
-      <strong>How this works:</strong> the AI uses the information below as its support knowledge. It will answer from the matching product or service, ask a focused question when the request is unclear, and avoid inventing details that are not configured here. Clarification buttons still appear only when needed.
+      <strong>How this works:</strong> the AI uses the information below as its support knowledge. It will answer from the matching offering or service, ask a focused question when the request is unclear, and avoid inventing details that are not configured here. Clarification buttons still appear only when needed.
     </div>
 
     <div class="section-heading">
@@ -297,7 +302,7 @@ const HTML = `<!DOCTYPE html>
     </div>
 
     <div class="section-heading">
-      <div><div class="section-kicker">02 · Voice</div><h3>Response guidelines</h3><p>Control how the assistant communicates without mixing style rules into product facts.</p></div>
+      <div><div class="section-kicker">02 · Voice</div><h3>Response guidelines</h3><p>Control how the assistant communicates without mixing style rules into offering facts.</p></div>
     </div>
     <div class="knowledge-grid">
       <div class="field">
@@ -319,10 +324,10 @@ const HTML = `<!DOCTYPE html>
     </div>
 
     <div class="section-heading">
-      <div><div class="section-kicker">03 · Catalog</div><h3>Products and services</h3><p>Add one record for each offering. The AI will use active records when answering questions.</p></div>
+      <div><div class="section-kicker">03 · Catalog</div><h3>Offerings catalog</h3><p>Add offerings, services, packages, subscriptions, courses, events, promotions, or any other offering.</p></div>
     </div>
-    <div id="product-list" class="product-list"></div>
-    <button class="btn-add" type="button" onclick="addProduct()">＋ Add product or service</button>
+    <div id="offering-list" class="offering-list"></div>
+    <button class="btn-add" type="button" onclick="addOffering()">＋ Add offering</button>
 
     <div class="section-heading">
       <div><div class="section-kicker">04 · Guardrails</div><h3>Policies and boundaries</h3><p>Set the rules the assistant must follow when information is missing or sensitive.</p></div>
@@ -431,89 +436,108 @@ const HTML = `<!DOCTYPE html>
     poll();
     setInterval(poll, 3000);
 
-    // ── Product knowledge editor ─────────────────────────────────────────────
-    let products = [];
+    // ── Offering knowledge editor ─────────────────────────────────────────────
+    let offerings = [];
 
     function valueOrEmpty(value) { return typeof value === 'string' ? value : ''; }
 
-    function normalizeProduct(product, index) {
-      product = product && typeof product === 'object' ? product : {};
+    function normalizeOffering(offering, index) {
+        offering = offering && typeof offering === 'object' ? offering : {};
+        const summary = valueOrEmpty(offering.summary) || valueOrEmpty(offering.description);
       return {
-        id: valueOrEmpty(product.id) || ('product_' + (index + 1)),
-        name: valueOrEmpty(product.name),
-        category: valueOrEmpty(product.category),
-        summary: valueOrEmpty(product.summary),
-        features: valueOrEmpty(product.features),
-        benefits: valueOrEmpty(product.benefits),
-        pricing: valueOrEmpty(product.pricing),
-        support: valueOrEmpty(product.support),
-        faqs: valueOrEmpty(product.faqs),
-        active: product.active !== false,
+        id: valueOrEmpty(offering.id) || ('offering_' + (index + 1)),
+        type: valueOrEmpty(offering.type) || 'custom',
+        name: valueOrEmpty(offering.name),
+        category: valueOrEmpty(offering.category),
+        summary: summary,
+        description: valueOrEmpty(offering.description) || summary,
+        features: valueOrEmpty(offering.features),
+        benefits: valueOrEmpty(offering.benefits),
+        pricing: valueOrEmpty(offering.pricing),
+        support: valueOrEmpty(offering.support),
+        faqs: valueOrEmpty(offering.faqs),
+        active: offering.active !== false,
       };
     }
 
-    function newProduct() {
-      return normalizeProduct({
-        id: 'product_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    function newOffering() {
+      return normalizeOffering({
+        id: 'offering_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         active: true,
-      }, products.length);
+      }, offerings.length);
     }
 
-    function productField(product, key, labelText, placeholder, multiline, wide, onInput) {
+    function offeringField(offering, key, labelText, placeholder, multiline, wide, onInput, options) {
       const wrapper = document.createElement('div');
       wrapper.className = 'field' + (wide ? ' field-wide' : '');
       const label = document.createElement('label');
       label.textContent = labelText;
-      const control = document.createElement(multiline ? 'textarea' : 'input');
-      if (!multiline) control.type = 'text';
+      const control = document.createElement(options ? 'select' : multiline ? 'textarea' : 'input');
+      if (!options && !multiline) control.type = 'text';
       if (multiline) control.className = 'compact';
       control.placeholder = placeholder;
-      control.value = product[key] || '';
+      if (options) {
+        options.forEach(function (option) {
+          const item = document.createElement('option');
+          item.value = option.value;
+          item.textContent = option.label;
+          control.appendChild(item);
+        });
+      }
+      control.value = offering[key] || (options && options[0] ? options[0].value : '');
       control.addEventListener('input', function () {
-        product[key] = control.value;
+        offering[key] = control.value;
         if (onInput) onInput(control.value);
       });
       wrapper.append(label, control);
       return wrapper;
     }
 
-    function renderProducts() {
-      const list = document.getElementById('product-list');
+    function offeringTypeLabel(type) {
+      const labels = {
+        product: 'Product', service: 'Service', package: 'Package', subscription: 'Subscription',
+        solution: 'Solution', course: 'Course', event: 'Event', promotion: 'Promotion', custom: 'Custom',
+      };
+      return labels[type] || 'Custom';
+    }
+
+    function renderOfferings() {
+      const list = document.getElementById('offering-list');
       list.replaceChildren();
-      if (!products.length) {
+      if (!offerings.length) {
         const empty = document.createElement('div');
-        empty.className = 'product-empty';
-        empty.textContent = 'No offerings added yet. Add your first product or service so the AI can answer with specific, accurate information.';
+        empty.className = 'offering-empty';
+        empty.textContent = 'No offerings added yet. Add your first product, service, package, subscription, course, event, promotion, or custom offering.';
         list.appendChild(empty);
         return;
       }
 
-      products.forEach(function (product, index) {
+      offerings.forEach(function (offering, index) {
         const card = document.createElement('div');
-        card.className = 'product-card';
+        card.className = 'offering-card';
 
         const head = document.createElement('div');
-        head.className = 'product-card-head';
+        head.className = 'offering-card-head';
         const titleBlock = document.createElement('div');
         const title = document.createElement('div');
-        title.className = 'product-card-title';
-        title.textContent = product.name || 'Untitled offering';
+        title.className = 'offering-card-title';
+        title.textContent = offering.name || 'Untitled offering';
         const subtitle = document.createElement('div');
-        subtitle.className = 'product-card-subtitle';
-        subtitle.textContent = product.category || 'Product or service';
+        subtitle.className = 'offering-card-subtitle';
+        subtitle.textContent = offeringTypeLabel(offering.type) + (offering.category ? ' · ' + offering.category : '');
         titleBlock.append(title, subtitle);
 
         const actions = document.createElement('div');
-        actions.className = 'product-actions';
+        actions.className = 'offering-actions';
         const status = document.createElement('button');
         status.type = 'button';
-        status.className = 'product-status' + (product.active ? '' : ' inactive');
-        status.textContent = product.active ? 'Active' : 'Paused';
+        status.className = 'offering-status' + (offering.active ? '' : ' inactive');
+        status.textContent = offering.active ? 'Active' : 'Paused';
         status.title = 'Click to toggle whether the AI can use this offering';
         status.addEventListener('click', function () {
-          product.active = !product.active;
-          status.className = 'product-status' + (product.active ? '' : ' inactive');
-          status.textContent = product.active ? 'Active' : 'Paused';
+          offering.active = !offering.active;
+          status.className = 'offering-status' + (offering.active ? '' : ' inactive');
+          status.textContent = offering.active ? 'Active' : 'Paused';
         });
         const remove = document.createElement('button');
         remove.type = 'button';
@@ -521,8 +545,8 @@ const HTML = `<!DOCTYPE html>
         remove.textContent = '×';
         remove.title = 'Remove this offering';
         remove.addEventListener('click', function () {
-          products.splice(index, 1);
-          renderProducts();
+          offerings.splice(index, 1);
+          renderOfferings();
         });
         actions.append(status, remove);
         head.append(titleBlock, actions);
@@ -530,18 +554,32 @@ const HTML = `<!DOCTYPE html>
         const grid = document.createElement('div');
         grid.className = 'knowledge-grid';
         grid.append(
-          productField(product, 'name', 'Name', 'e.g. Managed IT Support', false, false, function (value) {
+          offeringField(offering, 'type', 'Offering type', '', false, false, function (value) {
+            subtitle.textContent = offeringTypeLabel(value) + (offering.category ? ' · ' + offering.category : '');
+          }, [
+            { value: 'product', label: 'Product' },
+            { value: 'service', label: 'Service' },
+            { value: 'package', label: 'Package' },
+            { value: 'subscription', label: 'Subscription' },
+            { value: 'solution', label: 'Solution' },
+            { value: 'course', label: 'Course / training' },
+            { value: 'event', label: 'Event' },
+            { value: 'promotion', label: 'Promotion' },
+            { value: 'custom', label: 'Other / custom' },
+          ]),
+          offeringField(offering, 'name', 'Name', 'e.g. Managed IT Support', false, false, function (value) {
             title.textContent = value || 'Untitled offering';
           }),
-          productField(product, 'category', 'Category', 'e.g. Cybersecurity, consulting, software', false, false, function (value) {
-            subtitle.textContent = value || 'Product or service';
+          offeringField(offering, 'category', 'Category', 'e.g. Cybersecurity, consulting, software', false, false, function (value) {
+            subtitle.textContent = offeringTypeLabel(offering.type) + (value ? ' · ' + value : '');
           }),
-          productField(product, 'summary', 'One-line summary', 'What is this offering?', true, true),
-          productField(product, 'features', 'Features and inclusions', 'What does the customer receive? Add one item per line.', true, true),
-          productField(product, 'benefits', 'Customer benefits', 'What problem does it solve or what outcome does it provide?', true, true),
-          productField(product, 'pricing', 'Pricing and availability', 'Price range, quote process, plans, stock, or availability rules.', true, true),
-          productField(product, 'support', 'Delivery and support', 'Onboarding, delivery timeline, support channel, or service terms.', true, true),
-          productField(product, 'faqs', 'Frequently asked questions', 'Add common questions and answers. One Q&A per line or paragraph.', true, true),
+          offeringField(offering, 'summary', 'Short summary', 'What is this offering?', true, true),
+          offeringField(offering, 'description', 'Full description', 'Explain the offering in detail: who it is for, what it includes, and how it works.', true, true),
+          offeringField(offering, 'features', 'Features and inclusions', 'What does the customer receive? Add one item per line.', true, true),
+          offeringField(offering, 'benefits', 'Customer benefits', 'What problem does it solve or what outcome does it provide?', true, true),
+          offeringField(offering, 'pricing', 'Pricing and availability', 'Price range, quote process, plans, stock, or availability rules.', true, true),
+          offeringField(offering, 'support', 'Delivery and support', 'Onboarding, delivery timeline, support channel, or service terms.', true, true),
+          offeringField(offering, 'faqs', 'Frequently asked questions', 'Add common questions and answers. One Q&A per line or paragraph.', true, true),
         );
         card.append(head, grid);
         list.appendChild(card);
@@ -558,10 +596,10 @@ const HTML = `<!DOCTYPE html>
       if (element) element.value = value || '';
     }
 
-    function addProduct() {
-      products.push(newProduct());
-      renderProducts();
-      const cards = document.querySelectorAll('.product-card');
+    function addOffering() {
+      offerings.push(newOffering());
+      renderOfferings();
+      const cards = document.querySelectorAll('.offering-card');
       cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
@@ -581,10 +619,10 @@ const HTML = `<!DOCTYPE html>
         setValue('guideline-format', s.responseGuidelines && s.responseGuidelines.format);
         setValue('guideline-escalation', s.responseGuidelines && s.responseGuidelines.escalation);
         setValue('policies', s.policies);
-        products = Array.isArray(s.products) ? s.products.map(normalizeProduct) : [];
-        renderProducts();
+        offerings = Array.isArray(s.offerings) ? s.offerings.map(normalizeOffering) : [];
+        renderOfferings();
       } catch (_) {
-        renderProducts();
+        renderOfferings();
       }
     }
     loadSettings();
@@ -609,7 +647,7 @@ const HTML = `<!DOCTYPE html>
           format: getValue('guideline-format'),
           escalation: getValue('guideline-escalation'),
         },
-        products: products,
+        offerings: offerings,
         policies: getValue('policies'),
         // Keep the legacy field for older API clients. It is intentionally empty:
         // clarification buttons are generated dynamically only when needed.

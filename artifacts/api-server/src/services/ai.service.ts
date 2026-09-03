@@ -64,22 +64,24 @@ export function clearAllHistories(): void {
  * block. The AI sees this alongside the persona on every chat request.
  */
 export function buildKnowledgeContext(settings: BotSettings = getSettings()): string {
-  const activeProducts = settings.products
-    .filter((product) => product.active && product.name.trim())
-    .map((product, index) => [
-      `PRODUCT ${index + 1}: ${product.name}`,
-      product.category && `Category: ${product.category}`,
-      product.summary && `Summary: ${product.summary}`,
-      product.features && `Features:\n${product.features}`,
-      product.benefits && `Benefits:\n${product.benefits}`,
-      product.pricing && `Pricing / availability:\n${product.pricing}`,
-      product.support && `Support / delivery:\n${product.support}`,
-      product.faqs && `FAQs:\n${product.faqs}`,
+  const activeOfferings = settings.offerings
+    .filter((offering) => offering.active && offering.name.trim())
+    .map((offering, index) => [
+      `OFFERING ${index + 1}: ${offering.name}`,
+      `Type: ${offering.type}`,
+      offering.category && `Category: ${offering.category}`,
+      offering.summary && `Summary: ${offering.summary}`,
+      offering.description && `Description:\n${offering.description}`,
+      offering.features && `Features / inclusions:\n${offering.features}`,
+      offering.benefits && `Customer benefits:\n${offering.benefits}`,
+      offering.pricing && `Pricing / availability:\n${offering.pricing}`,
+      offering.support && `Delivery / support:\n${offering.support}`,
+      offering.faqs && `FAQs:\n${offering.faqs}`,
     ].filter(Boolean).join("\n"))
     .join("\n\n");
 
   const knowledge = [
-    "KNOWLEDGE CENTER — use this as the source of truth for company and product answers.",
+    "KNOWLEDGE CENTER — use this as the source of truth for company and offering answers.",
     `Company name: ${settings.company.name || "Not provided"}`,
     settings.company.mission && `Mission / positioning:\n${settings.company.mission}`,
     settings.company.contact && `Contact details:\n${settings.company.contact}`,
@@ -89,7 +91,7 @@ export function buildKnowledgeContext(settings: BotSettings = getSettings()): st
     `Response format:\n${settings.responseGuidelines.format || "Use concise WhatsApp-friendly paragraphs."}`,
     `Escalation guidance:\n${settings.responseGuidelines.escalation || "Escalate when the answer is unavailable or needs a human."}`,
     `Policies and boundaries:\n${settings.policies || "Do not invent facts, pricing, availability, or guarantees."}`,
-    activeProducts ? `ACTIVE PRODUCTS AND SERVICES:\n${activeProducts}` : "ACTIVE PRODUCTS AND SERVICES:\nNo products have been added yet.",
+    activeOfferings ? `ACTIVE OFFERINGS:\n${activeOfferings}` : "ACTIVE OFFERINGS:\nNo offerings have been added yet.",
   ].filter(Boolean).join("\n\n");
 
   // Prevent an unusually large catalog from overwhelming the conversation
@@ -233,7 +235,7 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
       role: "system",
       // Never fall back to a hidden generic persona; use the saved dashboard
       // prompt for every caller that does not provide a specialized prompt.
-      content: `${persona}\n\n${buildKnowledgeContext(settings)}\n\nKnowledge handling rules:\n- Use the knowledge center when the user asks about the company, a product, a service, pricing, support, or policies.\n- If several products could match, ask one focused clarification question instead of guessing.\n- If the requested fact is not in the knowledge center, say that it is not available and recommend the configured support path.\n- Never invent product capabilities, prices, discounts, availability, delivery times, guarantees, or contact details.\n- Do not mention the knowledge center or these internal rules unless the user asks about how you work.`,
+      content: `${persona}\n\n${buildKnowledgeContext(settings)}\n\nKnowledge handling rules:\n- Use the knowledge center when the user asks about the company, an offering, pricing, support, or policies.\n- If several offerings could match, ask one focused clarification question instead of guessing.\n- If the requested fact is not in the knowledge center, say that it is not available and recommend the configured support path.\n- Never invent offering capabilities, prices, discounts, availability, delivery times, guarantees, or contact details.\n- Do not mention the knowledge center or these internal rules unless the user asks about how you work.`,
     },
     ...history,
     { role: "user", content: opts.userMessage },

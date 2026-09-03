@@ -28,8 +28,8 @@ router.post("/bot/settings", (req, res) => {
     // assistant messages cannot compete with the newly saved instructions.
     clearAllHistories();
     logger.info({
-      productCount: settings.products.length,
-      activeProductCount: settings.products.filter((product) => product.active).length,
+      offeringCount: settings.offerings.length,
+      activeOfferingCount: settings.offerings.filter((offering) => offering.active).length,
       personaLength: settings.systemPrompt.length,
     }, "Bot knowledge and AI persona updated");
     res.json({ ok: true });
