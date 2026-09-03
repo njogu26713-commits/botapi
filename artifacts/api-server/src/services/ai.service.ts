@@ -127,7 +127,11 @@ export async function complete(
 
   const { client, model: defaultModel } = getClient();
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
-  if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
+  const configuredPrompt = systemPrompt?.trim() || getSettings().systemPrompt.trim();
+  messages.push({
+    role: "system",
+    content: `${configuredPrompt}\n\n${buildKnowledgeContext()}\n\nKnowledge handling rules:\n- Use the dashboard knowledge when the request concerns the company, an offering, pricing, support, or policies.\n- Never invent company details, offering capabilities, prices, availability, guarantees, or contact information.\n- If requested information is not configured, say that it is unavailable and recommend the configured support path.`,
+  });
   messages.push({ role: "user", content: prompt });
 
   const completion = await client.chat.completions.create({
@@ -207,8 +211,10 @@ Return clarification options only if the AI did not understand the user:`;
 export interface ChatOptions {
   phoneNumber: string;
   userMessage: string;
-  // When omitted by a command, use the currently saved dashboard persona.
+  // Use the current dashboard persona when no specialized prompt is supplied.
   systemPrompt?: string;
+  // Compatibility name used by specialized command plugins.
+  systemPromptOverride?: string;
 }
 
 export interface ChatResult {
@@ -228,7 +234,10 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
   const { client, model } = getClient();
   const history = getHistory(opts.phoneNumber);
   const settings = getSettings();
-  const persona = opts.systemPrompt?.trim() || settings.systemPrompt.trim();
+  const persona =
+    opts.systemPromptOverride?.trim() ||
+    opts.systemPrompt?.trim() ||
+    settings.systemPrompt.trim();
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
