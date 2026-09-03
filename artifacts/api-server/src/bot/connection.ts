@@ -29,6 +29,27 @@ export class WhatsAppConnection extends EventEmitter {
   public pairingCode: string | null = null;
   public isReady = false;
 
+  private scheduleReconnect(): void {
+    if (!this.shouldReconnect || this.reconnectTimer) return;
+
+    this.reconnectAttempts++;
+    const delay = Math.min(
+      this.reconnectDelay * Math.max(1, this.reconnectAttempts),
+      30000,
+    );
+    logger.info(
+      { attempt: this.reconnectAttempts, delay },
+      "Reconnecting to WhatsApp...",
+    );
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.isConnecting = false;
+      this.connect().catch((err) =>
+        logger.error({ err }, "Reconnect failed"),
+      );
+    }, delay);
+  }
+
   async connect(): Promise<void> {
     if (this.isConnecting) return;
     if (!this.shouldReconnect) this.shouldReconnect = true;
@@ -108,22 +129,7 @@ export class WhatsAppConnection extends EventEmitter {
 
           const terminalDisconnect = statusCode === 401 || statusCode === 403;
           if (this.shouldReconnect && !terminalDisconnect) {
-            this.reconnectAttempts++;
-            const delay = Math.min(
-              this.reconnectDelay * Math.max(1, this.reconnectAttempts),
-              30000,
-            );
-            logger.info(
-              { attempt: this.reconnectAttempts, delay },
-              "Reconnecting to WhatsApp...",
-            );
-            this.reconnectTimer = setTimeout(() => {
-              this.reconnectTimer = null;
-              this.isConnecting = false;
-              this.connect().catch((err) =>
-                logger.error({ err }, "Reconnect failed"),
-              );
-            }, delay);
+            this.scheduleReconnect();
           } else {
             logger.error("WhatsApp permanently disconnected — manual intervention required");
             this.emit("permanent_disconnect", { statusCode, reason });
@@ -152,6 +158,7 @@ export class WhatsAppConnection extends EventEmitter {
     } catch (err) {
       this.isConnecting = false;
       logger.error({ err }, "Failed to initialize WhatsApp connection");
+      this.scheduleReconnect();
       throw err;
     }
   }
