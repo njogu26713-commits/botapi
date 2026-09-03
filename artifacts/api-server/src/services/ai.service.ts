@@ -4,7 +4,7 @@
  */
 import OpenAI from "openai";
 import { config } from "../lib/config.js";
-import { getSettings } from "../lib/settings-store.js";
+import { getSettings, type BotSettings } from "../lib/settings-store.js";
 import { logger } from "../lib/logger.js";
 
 // ─── Client ───────────────────────────────────────────────────────────────────
@@ -59,6 +59,44 @@ export function clearAllHistories(): void {
   conversations.clear();
 }
 
+/**
+ * Turn the structured dashboard knowledge into a compact, grounded context
+ * block. The AI sees this alongside the persona on every chat request.
+ */
+export function buildKnowledgeContext(settings: BotSettings = getSettings()): string {
+  const activeProducts = settings.products
+    .filter((product) => product.active && product.name.trim())
+    .map((product, index) => [
+      `PRODUCT ${index + 1}: ${product.name}`,
+      product.category && `Category: ${product.category}`,
+      product.summary && `Summary: ${product.summary}`,
+      product.features && `Features:\n${product.features}`,
+      product.benefits && `Benefits:\n${product.benefits}`,
+      product.pricing && `Pricing / availability:\n${product.pricing}`,
+      product.support && `Support / delivery:\n${product.support}`,
+      product.faqs && `FAQs:\n${product.faqs}`,
+    ].filter(Boolean).join("\n"))
+    .join("\n\n");
+
+  const knowledge = [
+    "KNOWLEDGE CENTER — use this as the source of truth for company and product answers.",
+    `Company name: ${settings.company.name || "Not provided"}`,
+    settings.company.mission && `Mission / positioning:\n${settings.company.mission}`,
+    settings.company.contact && `Contact details:\n${settings.company.contact}`,
+    settings.company.hours && `Business hours:\n${settings.company.hours}`,
+    `Response tone: ${settings.responseGuidelines.tone || "Be friendly, clear, and professional."}`,
+    `Preferred language: ${settings.responseGuidelines.language || "English"}`,
+    `Response format:\n${settings.responseGuidelines.format || "Use concise WhatsApp-friendly paragraphs."}`,
+    `Escalation guidance:\n${settings.responseGuidelines.escalation || "Escalate when the answer is unavailable or needs a human."}`,
+    `Policies and boundaries:\n${settings.policies || "Do not invent facts, pricing, availability, or guarantees."}`,
+    activeProducts ? `ACTIVE PRODUCTS AND SERVICES:\n${activeProducts}` : "ACTIVE PRODUCTS AND SERVICES:\nNo products have been added yet.",
+  ].filter(Boolean).join("\n\n");
+
+  // Prevent an unusually large catalog from overwhelming the conversation
+  // history while retaining the beginning of the configured knowledge.
+  return knowledge.slice(0, 45000);
+}
+
 // ─── Compatibility shims for plugin commands ──────────────────────────────────
 
 /** Clear conversation history (alias used by plugin commands). */
@@ -103,9 +141,9 @@ export async function complete(
 
 /**
  * Given the user's message and the AI's reply, ask the AI to generate
- * 0–3 short quick-reply button labels that are the most natural follow-ups
- * for this specific conversation turn. Labels are freely invented — not
- * limited to a pre-configured pool.
+ * 0–3 short clarification options only when the AI did not understand the
+ * user's message. Labels are freely invented — not limited to a
+ * pre-configured pool.
  *
  * WhatsApp button labels must be ≤20 characters.
  */
@@ -119,19 +157,19 @@ export async function generateQuickReplies(
   try {
     const { client, model } = getClient();
 
-    const systemPrompt = `You generate short WhatsApp quick-reply button labels for a conversation.
-Based on what the user said and what the AI just replied, suggest 0 to 3 follow-up buttons the user might want to tap next.
+    const systemPrompt = `You generate short WhatsApp clarification-button labels for a conversation.
+Your ONLY job is to help the user clarify a message the AI did not understand.
 Rules:
-- Each label must be 20 characters or fewer (WhatsApp limit)
-- Labels must be clear, concise action phrases (e.g. "Learn more", "Get a quote", "Talk to support")
-- Only suggest buttons that are genuinely useful as a next step
-- If no follow-up makes sense (e.g. user said goodbye), return []
-- Respond with ONLY a JSON array of strings, nothing else. Example: ["Learn more","Get a quote"]`;
+- Return 1 to 3 buttons ONLY when the AI reply says or clearly implies that it does not understand the user's message, that the message is ambiguous, or that required information is missing.
+- When the AI answered, explained, acknowledged, or otherwise understood the message, return [] — do not suggest follow-up buttons.
+- Buttons must be possible interpretations or concise clarification choices, not generic calls to action.
+- Each label must be 20 characters or fewer (WhatsApp limit).
+- Respond with ONLY a JSON array of strings, nothing else. Examples: ["I need a price", "I need support"] or []`;
 
     const userPrompt = `User said: "${userMessage}"
 AI replied: "${aiReply.slice(0, 400)}"
 
-Suggest 0–3 quick-reply button labels for what the user might want next:`;
+Return clarification options only if the AI did not understand the user:`;
 
     const completion = await client.chat.completions.create({
       model,
@@ -187,13 +225,15 @@ export async function chat(opts: ChatOptions): Promise<ChatResult> {
 
   const { client, model } = getClient();
   const history = getHistory(opts.phoneNumber);
+  const settings = getSettings();
+  const persona = opts.systemPrompt?.trim() || settings.systemPrompt.trim();
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     {
       role: "system",
       // Never fall back to a hidden generic persona; use the saved dashboard
       // prompt for every caller that does not provide a specialized prompt.
-      content: (opts.systemPrompt?.trim() || getSettings().systemPrompt.trim()),
+      content: `${persona}\n\n${buildKnowledgeContext(settings)}\n\nKnowledge handling rules:\n- Use the knowledge center when the user asks about the company, a product, a service, pricing, support, or policies.\n- If several products could match, ask one focused clarification question instead of guessing.\n- If the requested fact is not in the knowledge center, say that it is not available and recommend the configured support path.\n- Never invent product capabilities, prices, discounts, availability, delivery times, guarantees, or contact details.\n- Do not mention the knowledge center or these internal rules unless the user asks about how you work.`,
     },
     ...history,
     { role: "user", content: opts.userMessage },

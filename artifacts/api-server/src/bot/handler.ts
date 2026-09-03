@@ -1,7 +1,7 @@
 /**
  * Message handler — routes all WhatsApp messages to Groq AI.
- * Any text a user sends gets an AI reply plus quick-reply buttons.
- * Messages starting with ! are admin commands (plugin system).
+ * AI clarification buttons are shown only when the AI does not understand a
+ * user's message. Messages starting with ! are admin commands (plugin system).
  */
 import { logger } from "../lib/logger.js";
 import { pluginRegistry } from "../plugins/loader.js";
@@ -171,23 +171,21 @@ export async function handleMessage(socket: any, message: any): Promise<void> {
       systemPrompt: settings.systemPrompt,
     });
 
-    // Generate buttons before sending so the answer and buttons appear in one
-    // WhatsApp card. The timeout prevents a slow second Groq request from
-    // keeping the user waiting indefinitely.
-    const chosenLabels = await Promise.race([
-      generateQuickReplies(prompt, result.reply),
-      new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 8000)),
-    ]);
-    const fallbackLabels = settings.quickReplies
-      .map((item) => item.label.trim())
-      .filter(Boolean)
-      .slice(0, 3);
-    const labels = chosenLabels.length > 0 ? chosenLabels : fallbackLabels;
-    const buttons = labels.map((label) => ({ id: label, text: label }));
+    // Offer clarification buttons only for a new message. A button tap already
+    // clarifies the user's intent, so its follow-up answer must be plain text.
+    // The timeout prevents a slow second AI request from keeping the user
+    // waiting indefinitely.
+    const chosenLabels = ctx.isButtonTap
+      ? []
+      : await Promise.race([
+          generateQuickReplies(prompt, result.reply),
+          new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 8000)),
+        ]);
+    const buttons = chosenLabels.map((label) => ({ id: label, text: label }));
 
     try {
       if (buttons.length > 0) {
-        // Keep the AI text and clickable buttons together in one card.
+        // Keep the clarification request and its options together in one card.
         await ctx.reply({ text: result.reply, footer: "FireboxTechs AI", buttons });
       } else {
         await ctx.replyText(result.reply);

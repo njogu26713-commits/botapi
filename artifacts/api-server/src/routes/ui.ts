@@ -1,7 +1,7 @@
 /**
  * Admin dashboard served at GET /
  * - WhatsApp connection panel (QR / connected state)
- * - AI control panel (system prompt + quick reply buttons)
+ * - AI control panel (system prompt + conditional clarification buttons)
  */
 import { Router, type IRouter } from "express";
 
@@ -154,28 +154,56 @@ const HTML = `<!DOCTYPE html>
     }
     textarea { min-height:100px; }
 
-    /* ── Quick replies list ────────────────────────────────── */
-    #qr-list { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
-
-    .qr-row {
-      display:flex; align-items:center; gap:8px;
+    /* ── Knowledge center ───────────────────────────────────── */
+    .section-heading {
+      display:flex; align-items:flex-start; justify-content:space-between;
+      gap:14px; margin:24px 0 12px;
     }
-    .qr-row input { flex:1; }
-    .btn-remove {
-      background:none; border:1px solid #ffffff15; border-radius:8px;
-      color:var(--muted); font-size:16px; cursor:pointer;
-      width:34px; height:34px; display:flex; align-items:center; justify-content:center;
-      flex-shrink:0; transition:all .15s;
+    .section-heading:first-of-type { margin-top:4px; }
+    .section-heading h3 { font-size:14px; font-weight:700; letter-spacing:-.2px; }
+    .section-heading p { color:var(--muted); font-size:11px; line-height:1.5; margin-top:4px; }
+    .section-kicker { color:var(--green); font-size:10px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; }
+    .knowledge-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .knowledge-grid .field { margin-bottom:4px; }
+    .field-wide { grid-column:1 / -1; }
+    .knowledge-grid label { display:flex; align-items:center; gap:6px; }
+    .field-hint { color:var(--muted); font-size:11px; line-height:1.45; margin-top:5px; }
+    input[type=text], textarea { min-height:40px; }
+    textarea.compact { min-height:78px; }
+    .product-list { display:flex; flex-direction:column; gap:12px; }
+    .product-card {
+      background:var(--surface2); border:1px solid var(--border); border-radius:14px;
+      padding:14px; box-shadow:0 8px 20px #00000015;
     }
-    .btn-remove:hover { background:#ff444420; border-color:#ff444440; color:#ff6666; }
-
-    .btn-add {
-      background:none; border:1px dashed var(--border); border-radius:10px;
-      color:var(--muted); font-size:13px; font-weight:500;
-      cursor:pointer; font-family:inherit;
-      padding:8px 0; width:100%; transition:all .2s;
+    .product-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .product-card-title { font-size:13px; font-weight:700; }
+    .product-card-subtitle { color:var(--muted); font-size:11px; margin-top:3px; }
+    .product-actions { display:flex; align-items:center; gap:8px; }
+    .product-status { background:none; border:0; color:var(--green); cursor:pointer; font-family:inherit; font-size:10px; font-weight:700; letter-spacing:.7px; padding:4px 0; text-transform:uppercase; }
+    .product-status.inactive { color:var(--muted); }
+    .btn-icon, .btn-add {
+      background:none; border:1px solid var(--border); border-radius:9px;
+      color:var(--muted); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
+      transition:all .2s;
     }
-    .btn-add:hover { border-color:#25D36650; color:var(--green); }
+    .btn-icon { width:32px; height:32px; }
+    .btn-icon:hover { background:#ff444420; border-color:#ff444450; color:#ff7777; }
+    .btn-add { border-style:dashed; padding:10px 12px; width:100%; }
+    .btn-add:hover { border-color:#25D36660; color:var(--green); background:#25D36608; }
+    .product-empty {
+      border:1px dashed var(--border); border-radius:12px; color:var(--muted);
+      font-size:12px; line-height:1.5; padding:18px; text-align:center;
+    }
+    .knowledge-callout {
+      background:linear-gradient(135deg,#25D36610,#3b82f608); border:1px solid #25D36625;
+      border-radius:12px; color:#c9e9d4; font-size:12px; line-height:1.55; padding:12px 14px;
+    }
+    .knowledge-callout strong { color:var(--green); }
+    @media (max-width: 560px) {
+      .knowledge-grid { grid-template-columns:1fr; }
+      .field-wide { grid-column:auto; }
+      .section-heading { margin-top:20px; }
+    }
 
     /* ── Save button ───────────────────────────────────────── */
     .btn-save {
@@ -239,10 +267,65 @@ const HTML = `<!DOCTYPE html>
       <p class="hint" style="text-align:left;margin-top:6px;">This instruction directly controls the bot’s personality, expertise, priorities, and response style.</p>
     </div>
 
+    <div class="knowledge-callout">
+      <strong>How this works:</strong> the AI uses the information below as its support knowledge. It will answer from the matching product or service, ask a focused question when the request is unclear, and avoid inventing details that are not configured here. Clarification buttons still appear only when needed.
+    </div>
+
+    <div class="section-heading">
+      <div><div class="section-kicker">01 · Identity</div><h3>Company profile</h3><p>Give the assistant the context it needs to represent your business accurately.</p></div>
+    </div>
+    <div class="knowledge-grid">
+      <div class="field">
+        <label for="company-name">Company name</label>
+        <input id="company-name" type="text" placeholder="e.g. FireboxTechs" />
+      </div>
+      <div class="field">
+        <label for="company-hours">Business hours</label>
+        <input id="company-hours" type="text" placeholder="e.g. Mon–Fri, 8:00–17:00" />
+      </div>
+      <div class="field field-wide">
+        <label for="company-mission">Mission / positioning</label>
+        <textarea id="company-mission" class="compact" placeholder="What your business does, who it serves, and what makes the offering valuable…"></textarea>
+      </div>
+      <div class="field field-wide">
+        <label for="company-contact">Contact and support channels</label>
+        <textarea id="company-contact" class="compact" placeholder="Phone, email, website, office location, or the preferred human-support route…"></textarea>
+      </div>
+    </div>
+
+    <div class="section-heading">
+      <div><div class="section-kicker">02 · Voice</div><h3>Response guidelines</h3><p>Control how the assistant communicates without mixing style rules into product facts.</p></div>
+    </div>
+    <div class="knowledge-grid">
+      <div class="field">
+        <label for="guideline-tone">Tone</label>
+        <input id="guideline-tone" type="text" placeholder="Friendly, clear, professional" />
+      </div>
+      <div class="field">
+        <label for="guideline-language">Preferred language</label>
+        <input id="guideline-language" type="text" placeholder="English" />
+      </div>
+      <div class="field field-wide">
+        <label for="guideline-format">Response format</label>
+        <textarea id="guideline-format" class="compact" placeholder="Short WhatsApp paragraphs, numbered steps, simple bullets…"></textarea>
+      </div>
+      <div class="field field-wide">
+        <label for="guideline-escalation">Escalation rule</label>
+        <textarea id="guideline-escalation" class="compact" placeholder="When should the assistant recommend human support, and what should it tell the user to do?"></textarea>
+      </div>
+    </div>
+
+    <div class="section-heading">
+      <div><div class="section-kicker">03 · Catalog</div><h3>Products and services</h3><p>Add one record for each offering. The AI will use active records when answering questions.</p></div>
+    </div>
+    <div id="product-list" class="product-list"></div>
+    <button class="btn-add" type="button" onclick="addProduct()">＋ Add product or service</button>
+
+    <div class="section-heading">
+      <div><div class="section-kicker">04 · Guardrails</div><h3>Policies and boundaries</h3><p>Set the rules the assistant must follow when information is missing or sensitive.</p></div>
+    </div>
     <div class="field">
-      <label>⚡ Quick Reply Buttons (shown after every AI reply)</label>
-      <div id="qr-list"></div>
-      <button class="btn-add" onclick="addQR()">＋ Add Button</button>
+      <textarea id="policies" class="compact" placeholder="Do not invent prices, availability, guarantees, or policies. Explain when a human is needed…"></textarea>
     </div>
 
     <button class="btn-save" id="save-btn" onclick="saveSettings()">Save Changes</button>
@@ -345,42 +428,138 @@ const HTML = `<!DOCTYPE html>
     poll();
     setInterval(poll, 3000);
 
-    // ── Quick replies editor ────────────────────────────────────────────────
-    function renderQRList(items) {
-      const list = document.getElementById('qr-list');
-      list.innerHTML = '';
-      items.forEach((qr, i) => {
-        const row = document.createElement('div');
-        row.className = 'qr-row';
-        row.innerHTML = \`
-          <input type="text" value="\${escHtml(qr.label)}" placeholder="Button label" data-idx="\${i}" oninput="onQRInput(this)" />
-          <button class="btn-remove" onclick="removeQR(\${i})" title="Remove">✕</button>\`;
-        list.appendChild(row);
+    // ── Product knowledge editor ─────────────────────────────────────────────
+    let products = [];
+
+    function valueOrEmpty(value) { return typeof value === 'string' ? value : ''; }
+
+    function normalizeProduct(product, index) {
+      product = product && typeof product === 'object' ? product : {};
+      return {
+        id: valueOrEmpty(product.id) || ('product_' + (index + 1)),
+        name: valueOrEmpty(product.name),
+        category: valueOrEmpty(product.category),
+        summary: valueOrEmpty(product.summary),
+        features: valueOrEmpty(product.features),
+        benefits: valueOrEmpty(product.benefits),
+        pricing: valueOrEmpty(product.pricing),
+        support: valueOrEmpty(product.support),
+        faqs: valueOrEmpty(product.faqs),
+        active: product.active !== false,
+      };
+    }
+
+    function newProduct() {
+      return normalizeProduct({
+        id: 'product_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        active: true,
+      }, products.length);
+    }
+
+    function productField(product, key, labelText, placeholder, multiline, wide, onInput) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'field' + (wide ? ' field-wide' : '');
+      const label = document.createElement('label');
+      label.textContent = labelText;
+      const control = document.createElement(multiline ? 'textarea' : 'input');
+      if (!multiline) control.type = 'text';
+      if (multiline) control.className = 'compact';
+      control.placeholder = placeholder;
+      control.value = product[key] || '';
+      control.addEventListener('input', function () {
+        product[key] = control.value;
+        if (onInput) onInput(control.value);
+      });
+      wrapper.append(label, control);
+      return wrapper;
+    }
+
+    function renderProducts() {
+      const list = document.getElementById('product-list');
+      list.replaceChildren();
+      if (!products.length) {
+        const empty = document.createElement('div');
+        empty.className = 'product-empty';
+        empty.textContent = 'No offerings added yet. Add your first product or service so the AI can answer with specific, accurate information.';
+        list.appendChild(empty);
+        return;
+      }
+
+      products.forEach(function (product, index) {
+        const card = document.createElement('div');
+        card.className = 'product-card';
+
+        const head = document.createElement('div');
+        head.className = 'product-card-head';
+        const titleBlock = document.createElement('div');
+        const title = document.createElement('div');
+        title.className = 'product-card-title';
+        title.textContent = product.name || 'Untitled offering';
+        const subtitle = document.createElement('div');
+        subtitle.className = 'product-card-subtitle';
+        subtitle.textContent = product.category || 'Product or service';
+        titleBlock.append(title, subtitle);
+
+        const actions = document.createElement('div');
+        actions.className = 'product-actions';
+        const status = document.createElement('button');
+        status.type = 'button';
+        status.className = 'product-status' + (product.active ? '' : ' inactive');
+        status.textContent = product.active ? 'Active' : 'Paused';
+        status.title = 'Click to toggle whether the AI can use this offering';
+        status.addEventListener('click', function () {
+          product.active = !product.active;
+          status.className = 'product-status' + (product.active ? '' : ' inactive');
+          status.textContent = product.active ? 'Active' : 'Paused';
+        });
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn-icon';
+        remove.textContent = '×';
+        remove.title = 'Remove this offering';
+        remove.addEventListener('click', function () {
+          products.splice(index, 1);
+          renderProducts();
+        });
+        actions.append(status, remove);
+        head.append(titleBlock, actions);
+
+        const grid = document.createElement('div');
+        grid.className = 'knowledge-grid';
+        grid.append(
+          productField(product, 'name', 'Name', 'e.g. Managed IT Support', false, false, function (value) {
+            title.textContent = value || 'Untitled offering';
+          }),
+          productField(product, 'category', 'Category', 'e.g. Cybersecurity, consulting, software', false, false, function (value) {
+            subtitle.textContent = value || 'Product or service';
+          }),
+          productField(product, 'summary', 'One-line summary', 'What is this offering?', true, true),
+          productField(product, 'features', 'Features and inclusions', 'What does the customer receive? Add one item per line.', true, true),
+          productField(product, 'benefits', 'Customer benefits', 'What problem does it solve or what outcome does it provide?', true, true),
+          productField(product, 'pricing', 'Pricing and availability', 'Price range, quote process, plans, stock, or availability rules.', true, true),
+          productField(product, 'support', 'Delivery and support', 'Onboarding, delivery timeline, support channel, or service terms.', true, true),
+          productField(product, 'faqs', 'Frequently asked questions', 'Add common questions and answers. One Q&A per line or paragraph.', true, true),
+        );
+        card.append(head, grid);
+        list.appendChild(card);
       });
     }
 
-    function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-    function getQRItems() {
-      return [...document.querySelectorAll('#qr-list input')].map(el => ({ label: el.value.trim() })).filter(qr => qr.label);
+    function getValue(id) {
+      const element = document.getElementById(id);
+      return element ? element.value.trim() : '';
     }
 
-    function onQRInput(el) { /* live update — captured on save */ }
-
-    function addQR() {
-      const items = getQRItems();
-      if (items.length >= 10) { showToast('Maximum 10 buttons', 'err'); return; }
-      items.push({ label: '' });
-      renderQRList(items);
-      // Focus last input
-      const inputs = document.querySelectorAll('#qr-list input');
-      inputs[inputs.length - 1]?.focus();
+    function setValue(id, value) {
+      const element = document.getElementById(id);
+      if (element) element.value = value || '';
     }
 
-    function removeQR(idx) {
-      const items = getQRItems();
-      items.splice(idx, 1);
-      renderQRList(items);
+    function addProduct() {
+      products.push(newProduct());
+      renderProducts();
+      const cards = document.querySelectorAll('.product-card');
+      cards[cards.length - 1]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     // ── Load settings ───────────────────────────────────────────────────────
@@ -389,9 +568,21 @@ const HTML = `<!DOCTYPE html>
         const res = await fetch('/api/bot/settings');
         if (!res.ok) return;
         const s = await res.json();
-        document.getElementById('system-prompt').value = s.systemPrompt || '';
-        renderQRList(s.quickReplies || []);
-      } catch (_) {}
+        setValue('system-prompt', s.systemPrompt);
+        setValue('company-name', s.company && s.company.name);
+        setValue('company-mission', s.company && s.company.mission);
+        setValue('company-contact', s.company && s.company.contact);
+        setValue('company-hours', s.company && s.company.hours);
+        setValue('guideline-tone', s.responseGuidelines && s.responseGuidelines.tone);
+        setValue('guideline-language', s.responseGuidelines && s.responseGuidelines.language);
+        setValue('guideline-format', s.responseGuidelines && s.responseGuidelines.format);
+        setValue('guideline-escalation', s.responseGuidelines && s.responseGuidelines.escalation);
+        setValue('policies', s.policies);
+        products = Array.isArray(s.products) ? s.products.map(normalizeProduct) : [];
+        renderProducts();
+      } catch (_) {
+        renderProducts();
+      }
     }
     loadSettings();
 
@@ -402,8 +593,24 @@ const HTML = `<!DOCTYPE html>
       btn.textContent = 'Saving…';
 
       const settings = {
-        systemPrompt: document.getElementById('system-prompt').value.trim(),
-        quickReplies: getQRItems(),
+        systemPrompt: getValue('system-prompt'),
+        company: {
+          name: getValue('company-name'),
+          mission: getValue('company-mission'),
+          contact: getValue('company-contact'),
+          hours: getValue('company-hours'),
+        },
+        responseGuidelines: {
+          tone: getValue('guideline-tone'),
+          language: getValue('guideline-language'),
+          format: getValue('guideline-format'),
+          escalation: getValue('guideline-escalation'),
+        },
+        products: products,
+        policies: getValue('policies'),
+        // Keep the legacy field for older API clients. It is intentionally empty:
+        // clarification buttons are generated dynamically only when needed.
+        quickReplies: [],
       };
 
       try {
@@ -413,12 +620,12 @@ const HTML = `<!DOCTYPE html>
           body: JSON.stringify(settings),
         });
         if (res.ok) {
-          showToast('✅ Settings saved!', 'ok');
+          showToast('✓ Knowledge center saved', 'ok');
         } else {
-          showToast('❌ Failed to save', 'err');
+          showToast('Failed to save knowledge center', 'err');
         }
       } catch (_) {
-        showToast('❌ Network error', 'err');
+        showToast('Network error while saving', 'err');
       }
 
       btn.disabled = false;
