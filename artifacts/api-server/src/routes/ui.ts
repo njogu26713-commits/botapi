@@ -40,15 +40,16 @@ const HTML = `<!DOCTYPE html>
       min-height: 100vh;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 32px 16px 64px;
+      align-items: stretch;
+      padding: 28px clamp(14px, 2.5vw, 40px) 64px;
       gap: 20px;
     }
 
     /* ── Brand ─────────────────────────────────────────────── */
     .brand {
       display: flex; align-items: center; gap: 12px;
-      width: 100%; max-width: 480px;
+      width: 100%; max-width: 1440px;
+      margin: 0 auto;
       padding-bottom: 4px;
     }
     .brand .logo { font-size: 32px; }
@@ -68,7 +69,9 @@ const HTML = `<!DOCTYPE html>
       border-radius: 18px;
       padding: 24px;
       width: 100%;
-      max-width: 480px;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: clamp(20px, 2.4vw, 34px);
     }
     .card-title {
       font-size: 11px;
